@@ -1,33 +1,15 @@
 <script setup lang="ts">
-definePageMeta({ layout:'admin', middleware:'auth' })
-const { data, refresh } = await useFetch(useApiUrl('/api/admin/categories'))
-const form = reactive({ name:'', slug:'', markerColor:'#eab308', icon:'pin' })
-const error = ref('')
-const saving = ref(false)
-function slugify() { if (!form.slug) form.slug = form.name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') }
-async function add() {
-  saving.value=true; error.value=''; slugify()
-  try { await $fetch(useApiUrl('/api/admin/categories'),{method:'POST',body:form}); Object.assign(form,{name:'',slug:'',markerColor:'#eab308',icon:'pin'}); await refresh() }
-  catch(e:any){ error.value=e?.data?.statusMessage||'Gagal menambah kategori' } finally{ saving.value=false }
-}
-async function update(c:any){
-  try{ await $fetch(useApiUrl(`/api/admin/categories/${c.id}`),{method:'PATCH',body:{name:c.name,markerColor:c.marker_color,icon:c.icon}}); await refresh() }
-  catch(e:any){ alert(e?.data?.statusMessage||'Gagal menyimpan') }
-}
+import { apiPath } from '@/utils/api'
+import { Plus, Trash2 } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import type { Category } from '@/types/gis'
+definePageMeta({middleware:'admin',layout:'admin'})
+const {data,refresh}=await useFetch<{items:Category[]}>(apiPath('/api/admin/categories'),{default:()=>({items:[]})})
+const name=ref('');const color=ref('#1d4ed8')
+async function add(){if(!name.value.trim())return;await $fetch(apiPath('/api/admin/categories'),{method:'POST',body:{name:name.value,color:color.value}});name.value='';await refresh()}
+async function remove(id:number){if(!confirm('Hapus kategori? Kategori yang masih dipakai tidak dapat dihapus.'))return;try{await $fetch(apiPath(`/api/admin/categories/${id}`),{method:'DELETE'});await refresh()}catch(e:any){alert(e?.data?.statusMessage||'Kategori gagal dihapus.')}}
 </script>
-<template>
-  <div>
-    <div class="page-head"><div><div class="eyebrow">Configuration</div><h1>Categories</h1><p>Siapkan layer baru seperti CCTV, APILL, halte, rambu, atau aset lainnya.</p></div></div>
-    <div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Tambah Category</h2></div><form class="card-body" @submit.prevent="add">
-      <div v-if="error" class="notice notice-error">{{ error }}</div><div class="form-grid">
-        <div class="form-field"><label>Nama</label><input v-model="form.name" class="input" required @blur="slugify"></div>
-        <div class="form-field"><label>Slug</label><input v-model="form.slug" class="input" required placeholder="traffic-light"></div>
-        <div class="form-field"><label>Marker color</label><input v-model="form.markerColor" type="color" class="input" style="height:42px;padding:5px"></div>
-        <div class="form-field"><label>Icon key</label><input v-model="form.icon" class="input"></div>
-      </div><button class="btn btn-primary" style="margin-top:14px" :disabled="saving">Tambah</button>
-    </form></div>
-    <div class="card"><div class="table-wrap"><table><thead><tr><th>Category</th><th>Slug</th><th>Marker</th><th>Icon</th><th></th></tr></thead><tbody>
-      <tr v-for="c in data?.categories || []" :key="c.id"><td><input v-model="c.name" class="input"></td><td>{{ c.slug }}</td><td><input v-model="c.marker_color" type="color" style="width:46px;height:32px;border:0;background:transparent"></td><td><input v-model="c.icon" class="input" style="width:120px"></td><td><button class="btn btn-sm" @click="update(c)">Save</button></td></tr>
-    </tbody></table></div></div>
-  </div>
-</template>
+<template><div class="space-y-6"><div><h1 class="text-2xl font-bold tracking-tight">Categories</h1><p class="mt-1 text-sm text-muted-foreground">Tambahkan layer/jenis aset baru tanpa mengubah struktur database.</p></div><div class="grid gap-6 lg:grid-cols-[360px_1fr]"><Card><CardHeader><CardTitle class="text-base">Kategori Baru</CardTitle><CardDescription>Contoh: CCTV, APILL, Halte, Rambu.</CardDescription></CardHeader><CardContent class="space-y-4"><div class="space-y-2"><Label>Nama</Label><Input v-model="name" placeholder="CCTV" /></div><div class="space-y-2"><Label>Warna marker</Label><div class="flex gap-2"><input v-model="color" type="color" class="h-10 w-14 rounded-md border bg-background p-1" /><Input v-model="color" /></div></div><Button class="w-full" @click="add"><Plus class="size-4" />Tambah kategori</Button></CardContent></Card><Card><CardHeader><CardTitle class="text-base">Daftar Kategori</CardTitle></CardHeader><CardContent><div class="divide-y"><div v-for="cat in data.items" :key="cat.id" class="flex items-center justify-between py-3"><div class="flex items-center gap-3"><span class="size-3 rounded-full" :style="{backgroundColor:cat.color}" /><div><div class="text-sm font-medium">{{cat.name}}</div><div class="text-xs text-muted-foreground">{{cat.slug}}</div></div></div><Button variant="ghost" size="icon" @click="remove(cat.id)"><Trash2 class="size-4 text-destructive" /></Button></div></div></CardContent></Card></div></div></template>

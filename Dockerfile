@@ -1,14 +1,19 @@
-FROM node:22-alpine AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
+ENV NODE_ENV=development
 COPY package*.json ./
-RUN npm install
+RUN npm install --ignore-scripts
 COPY . .
+RUN npm run postinstall
 RUN npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
 COPY --from=build /app/.output ./.output
-RUN mkdir -p /app/data/uploads /app/data/imports
+RUN mkdir -p /data/uploads /data/imports && chown -R node:node /data /app
+USER node
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]

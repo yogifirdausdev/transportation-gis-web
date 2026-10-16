@@ -1,16 +1,16 @@
 services:
   db:
-    platform: linux/amd64
-    image: postgis/postgis:17-3.6-alpine
+    build:
+      context: ./docker/postgis
     restart: unless-stopped
     environment:
-      POSTGRES_DB: gis
-      POSTGRES_USER: gis
-      POSTGRES_PASSWORD: gis
+      POSTGRES_DB: ${POSTGRES_DB:-gis}
+      POSTGRES_USER: ${POSTGRES_USER:-gis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gis -d gis"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gis} -d ${POSTGRES_DB:-gis}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -21,21 +21,39 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
     environment:
-      DATABASE_URL: postgresql://gis:gis@db:5432/gis
-      NUXT_SESSION_SECRET: ${NUXT_SESSION_SECRET:-replace-this-with-a-long-random-secret-123456789}
-      NUXT_ADMIN_EMAIL: ${NUXT_ADMIN_EMAIL:-admin@dishub.local}
-      NUXT_ADMIN_PASSWORD: ${NUXT_ADMIN_PASSWORD:-ChangeThisPassword123!}
-      NUXT_DATA_DIR: /app/data
-      NUXT_APP_BASE_URL: ${NUXT_APP_BASE_URL:-/}
+      NUXT_DATABASE_URL: postgres://${POSTGRES_USER:-gis}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gis}
+
+      NUXT_SESSION_SECRET: ${NUXT_SESSION_SECRET}
+      NUXT_ADMIN_EMAIL: ${NUXT_ADMIN_EMAIL}
+      NUXT_ADMIN_PASSWORD: ${NUXT_ADMIN_PASSWORD}
+
       NUXT_PUBLIC_APP_NAME: ${NUXT_PUBLIC_APP_NAME:-Transportation GIS}
       NUXT_PUBLIC_MAP_CENTER_LAT: ${NUXT_PUBLIC_MAP_CENTER_LAT:--6.1754}
       NUXT_PUBLIC_MAP_CENTER_LNG: ${NUXT_PUBLIC_MAP_CENTER_LNG:-106.8272}
-      NUXT_PUBLIC_MAP_ZOOM: ${NUXT_PUBLIC_MAP_ZOOM:-12}
-    ports:
-      - "3000:3000"
+      NUXT_PUBLIC_MAP_ZOOM: ${NUXT_PUBLIC_MAP_ZOOM:-11}
+      NUXT_PUBLIC_TILE_URL: ${NUXT_PUBLIC_TILE_URL:-https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png}
+      NUXT_PUBLIC_TILE_ATTRIBUTION: ${NUXT_PUBLIC_TILE_ATTRIBUTION:-&copy; OpenStreetMap contributors}
+
+      GIS_DATA_DIR: /data
+
     volumes:
-      - appdata:/app/data
+      - appdata:/data
+
+    networks:
+      - default
+      - proxy
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+networks:
+  proxy:
+    external: true
 
 volumes:
   pgdata:

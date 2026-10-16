@@ -1,40 +1,13 @@
 <script setup lang="ts">
-definePageMeta({ layout: false })
-const config = useRuntimeConfig()
-const email = ref('')
-const password = ref('')
-const loading = ref(false)
-const error = ref('')
-
-async function submit() {
-  loading.value = true
-  error.value = ''
-  try {
-    const data = await $fetch<{ user:any }>(useApiUrl('/api/auth/login'), { method: 'POST', body: { email: email.value, password: password.value } })
-    useState('auth-user').value = data.user
-    await navigateTo('/admin')
-  } catch (e: any) {
-    error.value = e?.data?.statusMessage || e?.statusMessage || 'Login gagal'
-  } finally { loading.value = false }
-}
+import { apiPath } from '@/utils/api'
+import { LockKeyhole, LoaderCircle } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert } from '@/components/ui/alert'
+definePageMeta({layout:false})
+const email=ref('');const password=ref('');const loading=ref(false);const error=ref('')
+async function submit(){loading.value=true;error.value='';try{await $fetch(apiPath('/api/auth/login'),{method:'POST',body:{email:email.value,password:password.value},credentials:'include'});await navigateTo('/admin')}catch(e:any){error.value=e?.data?.statusMessage||'Email atau password tidak valid.'}finally{loading.value=false}}
 </script>
-
-<template>
-  <div class="login-shell">
-    <main class="login-panel">
-      <div class="login-brand"><span class="brand-mark">GIS</span><strong>{{ config.public.appName }}</strong></div>
-      <div class="eyebrow">Management Console</div>
-      <h1>Masuk ke GIS</h1>
-      <p>Kelola titik lokasi, lakukan bulk import Excel, dan atur data peta dari satu tempat.</p>
-      <div v-if="error" class="notice notice-error">{{ error }}</div>
-      <form class="login-form" @submit.prevent="submit">
-        <div class="form-field"><label>Email</label><input v-model="email" class="input" type="email" autocomplete="username" required></div>
-        <div class="form-field"><label>Password</label><input v-model="password" class="input" type="password" autocomplete="current-password" required></div>
-        <button class="btn btn-primary" :disabled="loading">{{ loading ? 'Memproses…' : 'Masuk' }}</button>
-      </form>
-    </main>
-    <aside class="login-visual">
-      <div class="login-copy"><div class="eyebrow" style="color:#f5c518">Transportation Data Platform</div><div class="big">Satu peta untuk aset transportasi yang terus berkembang.</div><p>Dimulai dari speed bump, struktur aplikasi ini sudah disiapkan untuk kategori GIS lain tanpa menempel pada lifecycle WordPress.</p></div>
-    </aside>
-  </div>
-</template>
+<template><div class="grid min-h-dvh place-items-center bg-muted/40 p-4"><Card class="w-full max-w-md"><CardHeader><div class="mb-5"><AppLogo /></div><CardTitle>Masuk ke GIS Admin</CardTitle><CardDescription>Kelola lokasi, import data, kategori, dan akun operator.</CardDescription></CardHeader><CardContent><form class="space-y-4" @submit.prevent="submit"><Alert v-if="error" variant="destructive">{{error}}</Alert><div class="space-y-2"><Label for="email">Email</Label><Input id="email" v-model="email" type="email" autocomplete="username" required /></div><div class="space-y-2"><Label for="password">Password</Label><Input id="password" v-model="password" type="password" autocomplete="current-password" required /></div><Button class="w-full" type="submit" :disabled="loading"><LoaderCircle v-if="loading" class="size-4 animate-spin" /><LockKeyhole v-else class="size-4" />Sign in</Button><NuxtLink to="/" class="block text-center text-xs text-muted-foreground hover:text-foreground">← Kembali ke public map</NuxtLink></form></CardContent></Card></div></template>

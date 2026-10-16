@@ -1,0 +1,1 @@
+<script setup lang="ts">import { cn } from '@/lib/utils'; defineProps<{ class?: string; variant?: 'default'|'destructive' }>()</script><template><div role="alert" :class="cn('relative w-full rounded-lg border p-4 text-sm', variant==='destructive'&&'border-destructive/30 bg-destructive/5 text-destructive', $props.class)"><slot /></div></template>

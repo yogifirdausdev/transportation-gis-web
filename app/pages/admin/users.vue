@@ -1,17 +1,15 @@
 <script setup lang="ts">
-definePageMeta({ layout:'admin', middleware:'auth' })
-const { data, refresh } = await useFetch(useApiUrl('/api/admin/users'))
-const show = ref(false); const saving=ref(false); const error=ref('')
+import { apiPath } from '@/utils/api'
+import { UserPlus, Shield } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+definePageMeta({middleware:'admin',layout:'admin'})
+const {data,refresh}=await useFetch<any>(apiPath('/api/admin/users'),{default:()=>({items:[],me:null})})
 const form=reactive({name:'',email:'',password:'',role:'gis_editor'})
-async function createUser(){ saving.value=true;error.value='';try{await $fetch(useApiUrl('/api/admin/users'),{method:'POST',body:form});show.value=false;Object.assign(form,{name:'',email:'',password:'',role:'gis_editor'});await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Gagal membuat user'}finally{saving.value=false}}
-async function save(u:any){try{await $fetch(useApiUrl(`/api/admin/users/${u.id}`),{method:'PATCH',body:{name:u.name,role:u.role,password:''}});await refresh()}catch(e:any){alert(e?.data?.statusMessage||'Gagal menyimpan')}}
+const error=ref('')
+async function add(){error.value='';try{await $fetch(apiPath('/api/admin/users'),{method:'POST',body:form});Object.assign(form,{name:'',email:'',password:'',role:'gis_editor'});await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'User gagal dibuat.'}}
 </script>
-<template><div>
-  <div class="page-head"><div><div class="eyebrow">Access Control</div><h1>Users</h1><p>GIS Editor hanya mengelola data GIS. GIS Manager juga dapat mengatur kategori dan menghapus data.</p></div><button class="btn btn-primary" @click="show=true">＋ User</button></div>
-  <div class="card"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Dibuat</th><th></th></tr></thead><tbody>
-    <tr v-for="u in data?.users || []" :key="u.id"><td><input v-model="u.name" class="input"></td><td>{{ u.email }}</td><td><select v-model="u.role" class="select" style="width:160px"><option value="admin">Admin</option><option value="gis_manager">GIS Manager</option><option value="gis_editor">GIS Editor</option></select></td><td>{{ new Date(u.created_at).toLocaleDateString('id-ID') }}</td><td><button class="btn btn-sm" @click="save(u)">Save</button></td></tr>
-  </tbody></table></div></div>
-  <div v-if="show" class="modal-backdrop" @click.self="show=false"><form class="modal" @submit.prevent="createUser"><div class="modal-head"><h2>Tambah User GIS</h2><button type="button" class="close-btn" @click="show=false">×</button></div><div class="modal-body"><div v-if="error" class="notice notice-error">{{ error }}</div><div class="form-grid">
-    <div class="form-field"><label>Nama</label><input v-model="form.name" class="input" required></div><div class="form-field"><label>Email</label><input v-model="form.email" type="email" class="input" required></div><div class="form-field"><label>Password awal</label><input v-model="form.password" type="password" class="input" minlength="8" required></div><div class="form-field"><label>Role</label><select v-model="form.role" class="select"><option value="gis_editor">GIS Editor</option><option value="gis_manager">GIS Manager</option><option value="admin">Admin</option></select></div>
-  </div></div><div class="modal-actions"><button type="button" class="btn" @click="show=false">Batal</button><button class="btn btn-primary" :disabled="saving">Buat User</button></div></form></div>
-</div></template>
+<template><div class="space-y-6"><div><h1 class="text-2xl font-bold tracking-tight">Users</h1><p class="mt-1 text-sm text-muted-foreground">Akses admin GIS terpisah dari WordPress.</p></div><div class="grid gap-6 lg:grid-cols-[380px_1fr]"><Card><CardHeader><CardTitle class="text-base">Tambah User</CardTitle><CardDescription>GIS Editor hanya mengelola data GIS. GIS Manager juga mengelola kategori dan operator.</CardDescription></CardHeader><CardContent class="space-y-4"><div v-if="error" class="text-sm text-destructive">{{error}}</div><div class="space-y-2"><Label>Nama</Label><Input v-model="form.name" /></div><div class="space-y-2"><Label>Email</Label><Input v-model="form.email" type="email" /></div><div class="space-y-2"><Label>Password</Label><Input v-model="form.password" type="password" /></div><div class="space-y-2"><Label>Role</Label><Select v-model="form.role"><option value="gis_editor">GIS Editor</option><option value="gis_manager">GIS Manager</option><option value="admin">Administrator</option></Select></div><Button class="w-full" @click="add"><UserPlus class="size-4" />Tambah user</Button></CardContent></Card><Card><CardHeader><CardTitle class="flex items-center gap-2 text-base"><Shield class="size-4" />User Aktif</CardTitle></CardHeader><CardContent><div class="divide-y"><div v-for="user in data.items" :key="user.id" class="flex items-center justify-between py-3"><div><div class="text-sm font-medium">{{user.name}}</div><div class="text-xs text-muted-foreground">{{user.email}}</div></div><div class="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{{user.role}}</div></div></div></CardContent></Card></div></div></template>

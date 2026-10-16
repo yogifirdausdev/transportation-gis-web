@@ -1,8 +1,1 @@
-import { db } from '../../../utils/db'
-import { requireUser } from '../../../utils/auth'
-
-export default defineEventHandler(async (event) => {
-  await requireUser(event, ['admin','gis_manager','gis_editor'])
-  const result = await db.query('SELECT id,name,slug,marker_color,icon,created_at FROM categories ORDER BY name')
-  return { categories: result.rows }
-})
+import { requireUser } from '../../../utils/auth';import { db } from '../../../utils/db';export default defineEventHandler(async(event)=>{await requireUser(event);const r=await db().query('SELECT id,slug,name,color,icon,active FROM categories ORDER BY name');return {items:r.rows}})

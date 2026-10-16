@@ -1,37 +1,15 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth' })
-const { data, refresh } = await useFetch(useApiUrl('/api/admin/stats'))
+import { apiPath } from '@/utils/api'
+import { MapPin, Tags, CircleCheck, CircleAlert, Upload, Plus } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+definePageMeta({middleware:'admin',layout:'admin'})
+const {data}=await useFetch<any>(apiPath('/api/admin/dashboard'))
+const cards=computed(()=>[
+ {label:'Total Locations',value:data.value?.total||0,icon:MapPin},
+ {label:'Categories',value:data.value?.categories||0,icon:Tags},
+ {label:'Baik / Sesuai',value:data.value?.good||0,icon:CircleCheck},
+ {label:'Perlu Tindak Lanjut',value:data.value?.bad||0,icon:CircleAlert},
+])
 </script>
-
-<template>
-  <div>
-    <div class="page-head">
-      <div><div class="eyebrow">Overview</div><h1>Dashboard GIS</h1><p>Ringkasan data dan aktivitas terbaru.</p></div>
-      <div style="display:flex;gap:8px"><NuxtLink class="btn" to="/">Lihat Map</NuxtLink><NuxtLink class="btn btn-primary" to="/admin/import">Bulk Import</NuxtLink></div>
-    </div>
-    <div class="grid-stats">
-      <div class="stat-card"><span>Total titik</span><strong>{{ data?.summary?.total || 0 }}</strong></div>
-      <div class="stat-card"><span>Baik</span><strong>{{ data?.summary?.good || 0 }}</strong></div>
-      <div class="stat-card"><span>Tidak baik</span><strong>{{ data?.summary?.bad || 0 }}</strong></div>
-      <div class="stat-card"><span>Belum dinilai</span><strong>{{ data?.summary?.unassessed || 0 }}</strong></div>
-      <div class="stat-card"><span>Kecamatan</span><strong>{{ data?.summary?.districts || 0 }}</strong></div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h2>Data terbaru</h2><NuxtLink class="btn btn-sm" to="/admin/locations">Semua lokasi →</NuxtLink></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Lokasi</th><th>Kategori</th><th>Kecamatan</th><th>Kondisi</th><th>Ditambahkan</th></tr></thead>
-          <tbody>
-            <tr v-for="item in data?.recent || []" :key="item.id">
-              <td><div class="table-title">{{ item.name }}</div></td>
-              <td>{{ item.category_name }}</td><td>{{ item.district || '—' }}</td>
-              <td><StatusBadge :status="item.condition" /></td>
-              <td>{{ new Date(item.created_at).toLocaleDateString('id-ID') }}</td>
-            </tr>
-            <tr v-if="!data?.recent?.length"><td colspan="5" class="empty">Belum ada data. Mulai dari Bulk Import atau tambah lokasi manual.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</template>
+<template><div class="space-y-6"><div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 class="text-2xl font-bold tracking-tight">Dashboard</h1><p class="mt-1 text-sm text-muted-foreground">Ringkasan data Transportation GIS.</p></div><div class="flex gap-2"><NuxtLink to="/admin/import"><Button variant="outline"><Upload class="size-4" />Import Excel</Button></NuxtLink><NuxtLink to="/admin/locations/new"><Button><Plus class="size-4" />Tambah lokasi</Button></NuxtLink></div></div><div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Card v-for="item in cards" :key="item.label"><CardHeader class="flex-row items-center justify-between space-y-0 pb-2"><CardTitle class="text-sm font-medium">{{item.label}}</CardTitle><component :is="item.icon" class="size-4 text-muted-foreground" /></CardHeader><CardContent><div class="text-2xl font-bold">{{Number(item.value).toLocaleString('id-ID')}}</div></CardContent></Card></div><Card><CardHeader><CardTitle class="text-base">Data per Kecamatan</CardTitle><CardDescription>Distribusi record yang sudah tersimpan.</CardDescription></CardHeader><CardContent><div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3"><div v-for="row in data?.districts||[]" :key="row.district" class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"><span>{{row.district||'Tanpa kecamatan'}}</span><strong>{{row.count}}</strong></div></div></CardContent></Card></div></template>

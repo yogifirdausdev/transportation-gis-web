@@ -1,25 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { z } from 'zod'
-import { db } from '../../utils/db'
-import { createSession } from '../../utils/auth'
-
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1)
-})
-
-export default defineEventHandler(async (event) => {
-  const input = schema.parse(await readBody(event))
-  const result = await db.query(
-    'SELECT id, name, email, role, password_hash FROM users WHERE lower(email) = lower($1) LIMIT 1',
-    [input.email]
-  )
-  const user = result.rows[0]
-  if (!user || !(await bcrypt.compare(input.password, user.password_hash))) {
-    throw createError({ statusCode: 401, statusMessage: 'Email atau password salah' })
-  }
-
-  const sessionUser = { id: user.id, name: user.name, email: user.email, role: user.role }
-  await createSession(event, sessionUser)
-  return { user: sessionUser }
-})
+import { readBody, createError } from 'h3'
+import { db, ensureSchema } from '../../utils/db'
+import { setSession } from '../../utils/auth'
+export default defineEventHandler(async(event)=>{await ensureSchema();const body=await readBody<{email?:string;password?:string}>(event);const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');if(!email||!password)throw createError({statusCode:400,statusMessage:'Email dan password wajib diisi.'});const result=await db().query('SELECT id,name,email,password_hash,role,active FROM users WHERE email=$1',[email]);const row=result.rows[0];if(!row?.active||!(await bcrypt.compare(password,row.password_hash)))throw createError({statusCode:401,statusMessage:'Email atau password tidak valid.'});const user={id:Number(row.id),name:row.name,email:row.email,role:row.role};await setSession(event,user);return {user}})

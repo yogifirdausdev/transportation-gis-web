@@ -1,32 +1,4 @@
-import { db } from '../../../utils/db'
+import { getQuery } from 'h3'
 import { requireUser } from '../../../utils/auth'
-
-export default defineEventHandler(async (event) => {
-  await requireUser(event, ['admin','gis_manager','gis_editor'])
-  const q = getQuery(event)
-  const page = Math.max(Number(q.page || 1), 1)
-  const perPage = Math.min(Math.max(Number(q.perPage || 25), 1), 100)
-  const offset = (page - 1) * perPage
-  const values: any[] = []
-  const where: string[] = []
-  const add = (value: any) => { values.push(value); return `$${values.length}` }
-  if (q.search) {
-    const p = add(`%${String(q.search)}%`)
-    where.push(`(l.name ILIKE ${p} OR coalesce(l.district,'') ILIKE ${p})`)
-  }
-  if (q.category && q.category !== 'all') where.push(`c.slug = ${add(String(q.category))}`)
-  if (q.condition && q.condition !== 'all') where.push(`l.condition = ${add(String(q.condition))}`)
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
-
-  const [rows, count] = await Promise.all([
-    db.query(`
-      SELECT l.*, c.name AS category_name, c.slug AS category_slug, c.marker_color
-      FROM locations l JOIN categories c ON c.id=l.category_id
-      ${whereSql}
-      ORDER BY l.created_at DESC
-      LIMIT ${perPage} OFFSET ${offset}
-    `, values),
-    db.query(`SELECT count(*)::int AS count FROM locations l JOIN categories c ON c.id=l.category_id ${whereSql}`, values)
-  ])
-  return { locations: rows.rows, total: count.rows[0].count, page, perPage }
-})
+import { db } from '../../../utils/db'
+export default defineEventHandler(async(event)=>{await requireUser(event);const q=getQuery(event);const page=Math.max(1,Number(q.page)||1),limit=Math.max(1,Math.min(Number(q.limit)||30,100)),offset=(page-1)*limit;const where:string[]=[];const params:any[]=[];const add=(sql:string,val:any)=>{params.push(val);where.push(sql.replace('?',`$${params.length}`))};if(q.q){params.push(String(q.q));const i=params.length;where.push(`(l.name ILIKE '%'||$${i}||'%' OR COALESCE(l.address,'') ILIKE '%'||$${i}||'%')`)}if(q.category)add('c.slug=?',String(q.category));if(q.condition)add('l.condition=?',String(q.condition));if(q.district)add('l.district=?',String(q.district));const clause=where.length?'WHERE '+where.join(' AND '):'';const count=await db().query(`SELECT COUNT(*)::int count FROM locations l JOIN categories c ON c.id=l.category_id ${clause}`,params);params.push(limit,offset);const r=await db().query(`SELECT l.id,l.category_id,c.slug category_slug,c.name category_name,c.color category_color,l.name,l.district,l.address,l.condition,l.latitude::float8,l.longitude::float8,l.road_width::float8,l.speed_bump_units::float8,l.speed_bump_m::float8,l.endcap_units::float8,l.before_photo_url,l.after_photo_url,l.notes,l.metadata,l.created_at,l.updated_at FROM locations l JOIN categories c ON c.id=l.category_id ${clause} ORDER BY l.id DESC LIMIT $${params.length-1} OFFSET $${params.length}`,params);const total=Number(count.rows[0]?.count||0);return {items:r.rows,total,page,pages:Math.max(1,Math.ceil(total/limit))}})

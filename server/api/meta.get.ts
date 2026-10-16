@@ -1,0 +1,2 @@
+import { db, ensureSchema } from '../utils/db'
+export default defineEventHandler(async()=>{await ensureSchema();const [categories,districts,total]=await Promise.all([db().query('SELECT id,slug,name,color,icon,active FROM categories WHERE active=true ORDER BY name'),db().query(`SELECT DISTINCT district FROM locations WHERE district IS NOT NULL AND district<>'' ORDER BY district`),db().query('SELECT COUNT(*)::int count FROM locations')]);return {categories:categories.rows,districts:districts.rows.map(r=>r.district),total:Number(total.rows[0]?.count||0)}})

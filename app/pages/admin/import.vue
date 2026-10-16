@@ -1,86 +1,16 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth' })
-const file = ref<File | null>(null)
-const inputEl = ref<HTMLInputElement | null>(null)
-const preview = ref<any>(null)
-const loading = ref(false)
-const importing = ref(false)
-const error = ref('')
-const success = ref('')
-const skipDuplicates = ref(true)
-const fixLatitude = ref(true)
-
-function pickFile(e: Event) {
-  file.value = (e.target as HTMLInputElement).files?.[0] || null
-  preview.value = null; error.value=''; success.value=''
-}
-async function previewFile() {
-  if (!file.value) return
-  loading.value=true; error.value=''; success.value=''
-  const fd = new FormData(); fd.append('file', file.value)
-  try { preview.value = await $fetch(useApiUrl('/api/admin/import/preview'), { method:'POST', body:fd }) }
-  catch (e:any) { error.value = e?.data?.statusMessage || e?.statusMessage || 'Gagal membaca Excel' }
-  finally { loading.value=false }
-}
-async function commitImport() {
-  if (!preview.value?.token) return
-  importing.value=true; error.value=''; success.value=''
-  try {
-    const r:any = await $fetch(useApiUrl('/api/admin/import/commit'), { method:'POST', body:{ token:preview.value.token, skipDuplicates:skipDuplicates.value, fixPositiveJakartaLatitude:fixLatitude.value } })
-    success.value = `Import selesai: ${r.imported} lokasi masuk, ${r.skipped} dilewati.`
-    preview.value=null; file.value=null
-    if (inputEl.value) inputEl.value.value=''
-  } catch (e:any) { error.value = e?.data?.statusMessage || e?.statusMessage || 'Import gagal' }
-  finally { importing.value=false }
-}
-function labelCondition(v:string) { return ({good:'Baik / Sesuai',bad:'Tidak Baik',unassessed:'Belum Dinilai'} as any)[v] || v }
+import { apiPath } from '@/utils/api'
+import { FileSpreadsheet, UploadCloud, LoaderCircle, CheckCircle2, AlertTriangle } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Alert } from '@/components/ui/alert'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+definePageMeta({middleware:'admin',layout:'admin'})
+const file=ref<File|null>(null);const loading=ref(false);const committing=ref(false);const preview=ref<any>(null);const error=ref('');const result=ref<any>(null)
+const fixLatitude=ref(true);const skipDuplicates=ref(true)
+function picked(e:Event){file.value=(e.target as HTMLInputElement).files?.[0]||null;preview.value=null;result.value=null;error.value=''}
+async function runPreview(){if(!file.value)return;loading.value=true;error.value='';try{const fd=new FormData();fd.append('file',file.value);preview.value=await $fetch(apiPath('/api/admin/import/preview'),{method:'POST',body:fd})}catch(e:any){error.value=e?.data?.statusMessage||'Preview gagal.'}finally{loading.value=false}}
+async function commit(){if(!preview.value?.token)return;committing.value=true;error.value='';try{result.value=await $fetch(apiPath('/api/admin/import/commit'),{method:'POST',body:{token:preview.value.token,fixLatitude:fixLatitude.value,skipDuplicates:skipDuplicates.value}})}catch(e:any){error.value=e?.data?.statusMessage||'Import gagal.'}finally{committing.value=false}}
 </script>
-
-<template>
-  <div>
-    <div class="page-head"><div><div class="eyebrow">Data Ingestion</div><h1>Bulk Import Excel</h1><p>Upload langsung laporan Dishub .xlsx. Foto embedded, koordinat, status, dan kecamatan akan dibaca otomatis.</p></div></div>
-    <div v-if="error" class="notice notice-error">{{ error }}</div>
-    <div v-if="success" class="notice notice-success">{{ success }}</div>
-    <div class="card">
-      <div class="card-body">
-        <div class="dropzone">
-          <strong>{{ file ? file.name : 'Pilih file laporan .xlsx' }}</strong>
-          <p>Template seperti “Bobot Pemasangan Speedbump” didukung langsung. Maksimum 50 MB.</p>
-          <input ref="inputEl" type="file" accept=".xlsx" style="display:none" @change="pickFile">
-          <button class="btn" type="button" @click="inputEl?.click()">Pilih File</button>
-          <button v-if="file" class="btn btn-primary" style="margin-left:8px" :disabled="loading" @click="previewFile">{{ loading ? 'Membaca…' : 'Preview Import' }}</button>
-        </div>
-      </div>
-    </div>
-
-    <template v-if="preview">
-      <div class="import-summary">
-        <div><b>{{ preview.summary.rows }}</b><span>Lokasi</span></div>
-        <div><b>{{ preview.summary.photos }}</b><span>Foto</span></div>
-        <div><b>{{ preview.summary.correctedLatitudes }}</b><span>Latitude diperbaiki</span></div>
-        <div><b>{{ preview.summary.unassessed }}</b><span>Belum dinilai</span></div>
-        <div><b>{{ preview.summary.duplicateCoordinates }}</b><span>Duplikat internal</span></div>
-      </div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><h2>Import Options · Sheet: {{ preview.worksheet }}</h2></div>
-        <div class="card-body">
-          <label class="check-row"><input v-model="fixLatitude" type="checkbox"><span><strong>Perbaiki latitude Jakarta yang positif</strong><br>Contoh 6.1178029 → -6.1178029 bila longitude berada di rentang Jakarta.</span></label>
-          <label class="check-row"><input v-model="skipDuplicates" type="checkbox"><span><strong>Lewati koordinat duplikat</strong><br>Mencegah titik yang sama masuk dua kali dari file yang sama atau data yang sudah ada.</span></label>
-          <div v-for="w in preview.warnings" :key="w" class="notice notice-warn">{{ w }}</div>
-          <button class="btn btn-yellow" :disabled="importing" @click="commitImport">{{ importing ? 'Mengimport…' : `Import ${preview.summary.rows} Locations` }}</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><h2>Preview Data</h2><span style="font-size:10px;color:#6c7688">{{ preview.filename }}</span></div>
-        <div class="table-wrap">
-          <table><thead><tr><th>No</th><th>Lokasi</th><th>Kecamatan</th><th>Koordinat</th><th>Kondisi</th><th>Speed Bump</th><th>Foto</th></tr></thead>
-          <tbody><tr v-for="r in preview.rows" :key="r.rowNumber">
-            <td>{{ r.sequence ?? '—' }}</td><td><div class="table-title">{{ r.name }}</div><div v-if="r.latitudeCorrected" class="table-sub">Latitude akan dikoreksi</div></td>
-            <td>{{ r.district || '—' }}</td><td style="white-space:nowrap">{{ r.latitude }}, {{ r.longitude }}</td>
-            <td><StatusBadge :status="r.condition" /></td><td>{{ r.speedBumpMeters ?? '—' }} m</td><td>{{ (r.hasBeforePhoto?1:0)+(r.hasAfterPhoto?1:0) }}/2</td>
-          </tr></tbody></table>
-        </div>
-      </div>
-    </template>
-  </div>
-</template>
+<template><div class="space-y-6"><div><h1 class="text-2xl font-bold tracking-tight">Bulk Import</h1><p class="mt-1 text-sm text-muted-foreground">Upload Excel laporan Dishub langsung tanpa konversi ke CSV.</p></div><Alert v-if="error" variant="destructive">{{error}}</Alert><Card><CardHeader><CardTitle class="flex items-center gap-2 text-base"><FileSpreadsheet class="size-4" />Dishub Excel (.xlsx)</CardTitle><CardDescription>Importer mengenali header bertingkat, section kecamatan, koordinat, status, serta foto embedded Sebelum/Sesudah.</CardDescription></CardHeader><CardContent class="space-y-4"><label class="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 p-6 text-center hover:bg-muted/40"><UploadCloud class="size-7 text-muted-foreground" /><div><div class="text-sm font-medium">{{file?.name||'Pilih file Excel'}}</div><div class="mt-1 text-xs text-muted-foreground">.xlsx, maksimum 60 MB</div></div><Input class="hidden" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="picked" /></label><Button :disabled="!file||loading" @click="runPreview"><LoaderCircle v-if="loading" class="size-4 animate-spin" /><FileSpreadsheet v-else class="size-4" />Preview file</Button></CardContent></Card><Card v-if="preview"><CardHeader><CardTitle class="text-base">Preview Import</CardTitle><CardDescription>Sheet terpilih: {{preview.sheet}}</CardDescription></CardHeader><CardContent class="space-y-5"><div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><div class="rounded-lg border p-3"><div class="text-2xl font-bold">{{preview.summary.records}}</div><div class="text-xs text-muted-foreground">Locations</div></div><div class="rounded-lg border p-3"><div class="text-2xl font-bold">{{preview.summary.images}}</div><div class="text-xs text-muted-foreground">Embedded photos</div></div><div class="rounded-lg border p-3"><div class="text-2xl font-bold">{{preview.summary.latitudeFixes}}</div><div class="text-xs text-muted-foreground">Latitude corrections</div></div><div class="rounded-lg border p-3"><div class="text-2xl font-bold">{{preview.summary.unassessed}}</div><div class="text-xs text-muted-foreground">Belum dinilai</div></div><div class="rounded-lg border p-3"><div class="text-2xl font-bold">{{preview.summary.duplicateCoordinates}}</div><div class="text-xs text-muted-foreground">Potential duplicates</div></div></div><div class="space-y-3 rounded-lg border p-4"><label class="flex items-start gap-3"><input v-model="fixLatitude" type="checkbox" class="mt-1 size-4" /><span><span class="block text-sm font-medium">Perbaiki latitude Jakarta yang positif</span><span class="text-xs text-muted-foreground">Contoh 6.1178029 → -6.1178029 ketika longitude menunjukkan area Jakarta.</span></span></label><label class="flex items-start gap-3"><input v-model="skipDuplicates" type="checkbox" class="mt-1 size-4" /><span><span class="block text-sm font-medium">Lewati koordinat yang sudah ada</span><span class="text-xs text-muted-foreground">Mengurangi risiko import file yang sama dua kali.</span></span></label></div><div class="overflow-hidden rounded-lg border"><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-muted/50 text-left"><tr><th class="p-3">Lokasi</th><th class="p-3">Kecamatan</th><th class="p-3">Koordinat sumber</th><th class="p-3">Status</th><th class="p-3">Foto</th></tr></thead><tbody><tr v-for="row in preview.rows.slice(0,12)" :key="row.row" class="border-t"><td class="p-3 font-medium">{{row.name}}</td><td class="p-3">{{row.district}}</td><td class="p-3 font-mono">{{row.sourceLatitude}}, {{row.longitude}}</td><td class="p-3">{{row.condition}}</td><td class="p-3">{{row.photoCount}}</td></tr></tbody></table></div></div><div v-if="preview.rows.length>12" class="text-xs text-muted-foreground">Menampilkan 12 dari {{preview.rows.length}} baris.</div><Button size="lg" :disabled="committing" @click="commit"><LoaderCircle v-if="committing" class="size-4 animate-spin" /><CheckCircle2 v-else class="size-4" />Import {{preview.summary.records}} locations</Button></CardContent></Card><Alert v-if="result"><div class="flex items-start gap-3"><CheckCircle2 class="mt-0.5 size-5 text-emerald-600" /><div><div class="font-medium">Import selesai</div><div class="mt-1 text-sm text-muted-foreground">{{result.inserted}} record masuk, {{result.skipped}} dilewati, {{result.photos}} foto tersimpan.</div></div></div></Alert></div></template>
