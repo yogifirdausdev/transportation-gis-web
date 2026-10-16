@@ -1,14 +1,12 @@
 import pg from 'pg'
-
 const { Pool } = pg
-const globalForDb = globalThis as unknown as { gisPool?: pg.Pool }
-
-const pool = globalForDb.gisPool || new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://gis:gis@localhost:5432/gis',
-  max: 10,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000
-})
-
-if (process.env.NODE_ENV !== 'production') globalForDb.gisPool = pool
-export const db = pool
+let pool: any = null
+export function db() {
+  if (!pool) {
+    const config = useRuntimeConfig()
+    if (!config.databaseUrl) throw new Error('DATABASE_URL is not configured')
+    pool = new Pool({ connectionString: config.databaseUrl as string })
+  }
+  return pool
+}
+export async function q(text: string, params: any[] = []) { return db().query(text, params) }

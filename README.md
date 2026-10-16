@@ -1,223 +1,179 @@
-# Transportation GIS Web
+# Transportation GIS v0.2
 
-Standalone GIS web app for transportation assets. The first supported dataset is **Speed Bump**, but the data model is multi-category so CCTV, APILL, bus stops, signs, parking, and other point assets can be added later without changing the core schema.
+Standalone GIS web application for managing and publishing transportation facility points. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
 
-## Stack
+## v0.2 scope
 
-- Nuxt 4 + Nitro full-stack server
-- Leaflet + OpenStreetMap
-- PostgreSQL 17 + PostGIS 3.6
-- Cookie/JWT authentication
-- Role-based access: `admin`, `gis_manager`, `gis_editor`
-- ExcelJS + direct XLSX drawing extraction for Dishub Excel imports
-- Docker Compose deployment
+- Transit Teal UI refresh based on shadcn UI patterns
+- Resilient public Leaflet map lifecycle
+- Public/Admin field separation
+- Public popup: photo, category, district, coordinates
+- Admin-only condition and source metadata
+- 44 DKI Jakarta districts as application master data
+- Location fiscal year (`Tahun Anggaran`)
+- Single photo per location
+- Category marker color can be edited after category creation
+- Standard Excel template import
+- Import preview with `Valid`, `Warning`, and `Will not import` rows plus reasons
+- Source tracking: Manual or Excel filename + source row + import batch
+- Import history and safe rollback
+- DB-backed admin session designed to work behind Caddy
+- Admin / GIS Manager / GIS Editor roles
 
-## Implemented MVP features
-
-- Public full-screen interactive map
-- Bounding-box API: only points in the visible map area are requested
-- Search and filters by category, condition, and district
-- Multi-category marker colors
-- Admin dashboard
-- Location CRUD
-- Category management
-- GIS user management
-- GIS Editor / GIS Manager access separation
-- Direct `.xlsx` bulk import for the Dishub speed-bump report format
-- Extracts embedded Before/After photos from XLSX drawing anchors
-- Corrects positive Jakarta latitude values such as `6.1178` to `-6.1178`
-- Handles decimal comma coordinates
-- Import preview, status validation, and duplicate-coordinate protection
-- PostGIS geometry column + spatial index
-- Can run on `/` or under a subpath such as `/gis/`
-
-## 1. Quick start with Docker
-
-Copy the environment file:
+## Local development
 
 ```bash
 cp .env.example .env
 ```
 
-Change at least these values:
+Generate a session secret:
 
-```env
-NUXT_SESSION_SECRET=put-a-long-random-secret-here
-NUXT_ADMIN_EMAIL=your-admin@email.local
-NUXT_ADMIN_PASSWORD=use-a-strong-password
+```bash
+openssl rand -hex 32
 ```
 
-Start the stack:
+Edit `.env` and set at least:
+
+```env
+NUXT_SESSION_SECRET=<generated secret>
+NUXT_ADMIN_EMAIL=admin@example.local
+NUXT_ADMIN_PASSWORD=<strong password>
+```
+
+Then:
 
 ```bash
 docker compose up -d --build
+docker compose ps
+docker compose logs -f app
 ```
 
 Open:
 
-```text
-http://localhost:3000
+- Public map: http://localhost:3000
+- Admin: http://localhost:3000/admin
+
+## Excel import template
+
+Download from the application or directly from:
+
+`/templates/Template_Import_Transportation_GIS_v0.2.xlsx`
+
+The `Template Import` sheet uses one row per GIS point:
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| No | No | Sequence only |
+| Tahun Anggaran | Yes | Example: `2026` |
+| Kecamatan | Yes | Plain text. Validated against the application's district master |
+| Lokasi Kegiatan | Yes | Internal/admin location name |
+| Latitude | Yes | Jakarta should be negative, e.g. `-6.1433398` |
+| Longitude | Yes | e.g. `106.7850379` |
+| Kategori | Yes | e.g. `Speed Bump` |
+| Kondisi | No | Internal only. Unknown/blank values become `Belum Dinilai` with warning |
+| Foto | No | One embedded photo per row |
+
+The template intentionally has no dropdowns. District and category values are validated during preview.
+
+## Import preview behavior
+
+Rows are classified before commit:
+
+- **Valid**: ready to import
+- **Warning**: imports, but has non-blocking issues such as missing photo or unknown condition
+- **Will not import**: blocking issue such as invalid coordinates, unknown category, missing required data, or a duplicate when `Skip duplicates` is enabled
+- An unrecognized district is a **Warning**: the original text is imported as internal data, hidden from the public map, and can be corrected from Edit Location using the district dropdown
+
+Potential duplicates are checked using `category + latitude + longitude`.
+
+## Import rollback
+
+Every Excel import creates an import batch. Rollback soft-deletes only records from that batch that have **not** been manually edited after import. Edited records are retained.
+
+## Authentication and Caddy
+
+Sessions are stored in PostgreSQL. The browser receives an opaque HTTP-only cookie.
+
+The cookie `Secure` flag is determined from the actual request protocol or `X-Forwarded-Proto`, so it works behind Caddy without treating plain local HTTP as HTTPS.
+
+A production compose override is included to attach the app to an existing Caddy Docker network:
+
+```bash
+# find the network name first
+docker network ls
+
+# example when your shared Caddy network is named proxy
+PROXY_NETWORK=proxy docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Admin:
+The production override gives the app container a stable name:
 
-```text
-http://localhost:3000/admin
-```
+`gis-app`
 
-The first startup automatically creates the database tables, enables PostGIS, creates the `Speed Bump` category, and creates the bootstrap admin if the user table is empty.
+Caddy example:
 
-## 2. Import the existing Dishub Excel report
-
-Go to:
-
-```text
-Admin GIS → Bulk Import
-```
-
-Upload a file such as:
-
-```text
-6. Bobot Pemasangan Speedbump Termin II (Koja).xlsx
-```
-
-The importer detects the worksheet with these logical fields:
-
-- Lokasi Kegiatan
-- Lebar Jalan
-- SPEED BUMP (unit)
-- SPEED BUMP (m)
-- ENDCAP (pasang)
-- Latitude
-- Longitude / Longtitude
-- Foto Sebelum
-- Foto Sesudah
-- Baik / Sesuai
-- Tidak Baik / Tidak Sesuai
-- Kecamatan section rows
-
-The provided Koja workbook is expected to yield 31 location rows and 62 anchored photos.
-
-## 3. Roles
-
-### GIS Editor
-
-Can:
-- view admin GIS data
-- create/edit locations
-- bulk import Excel
-
-Cannot:
-- delete locations
-- manage categories
-- manage users
-
-### GIS Manager
-
-Can everything GIS Editor can, plus:
-- delete locations
-- manage categories
-
-### Admin
-
-Can additionally manage GIS users.
-
-These are app-level roles and do not grant any WordPress access because this application is fully separate from WordPress.
-
-## 4. Deploy on the same domain as WordPress
-
-The recommended long-term setup is reverse proxying the app under `/gis/` while WordPress remains at `/`.
-
-Set:
-
-```env
-NUXT_APP_BASE_URL=/gis/
-```
-
-Example Nginx block, assuming the GIS app listens on `127.0.0.1:3000`:
-
-```nginx
-location /gis/ {
-    client_max_body_size 60M;
-    proxy_read_timeout 120s;
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+```caddyfile
+gis.example.com {
+    reverse_proxy gis-app:3000
 }
 ```
 
-Important: there is **no trailing slash** after `3000` in `proxy_pass`, so Nginx preserves the `/gis/` prefix. Nuxt's `NUXT_APP_BASE_URL` then handles application routes, assets, API routes, and uploaded photos under the same prefix.
+Caddy and `gis-app` must share the same Docker network.
 
-The result can be:
+## Replacing an existing repo
 
-```text
-https://dishub.example.go.id/       → WordPress
-https://dishub.example.go.id/gis/   → Transportation GIS
-```
-
-A subdomain such as `gis.dishub.example.go.id` is also fine and is slightly simpler operationally.
-
-## 5. Development without Docker
-
-You still need PostgreSQL + PostGIS available locally.
+Test this version in a separate folder first. Before overwriting your existing repository:
 
 ```bash
-npm install
-cp .env.example .env
-npm run dev
+git switch -c backup/pre-v0.2
+git push -u origin backup/pre-v0.2
+git switch main
 ```
 
-For local development with a database running on localhost, set:
+Then copy the new source while preserving `.git` and `.env`, for example:
 
-```env
-DATABASE_URL=postgresql://gis:gis@localhost:5432/gis
-NUXT_APP_BASE_URL=/
+```bash
+rsync -av --delete --exclude='.git' --exclude='.env' /path/to/transportation-gis-v0.2/ /path/to/current-repo/
 ```
 
-## 6. Data model
+Review:
 
-Core location records use a general model rather than a `speed_bump`-specific table:
+```bash
+git status
+git diff --stat
+```
+
+Suggested commit:
 
 ```text
-locations
-├── category_id
-├── name
-├── district
-├── address
-├── condition
-├── latitude
-├── longitude
-├── geom (PostGIS Point, EPSG:4326)
-├── details (JSONB)
-├── before_photo_url
-├── after_photo_url
-├── source_file
-├── created_by
-└── updated_by
+feat: implement Transportation GIS v0.2
 ```
 
-Speed-bump-specific fields such as road width, unit count, meter length, and endcap count are stored inside `details` JSONB. This keeps the core table usable for future categories.
+## Database upgrade warning
 
-## 7. Production notes
+v0.2 bootstraps its schema automatically using `CREATE TABLE IF NOT EXISTS` and additive setup. However, if your previous prototype used materially different table definitions, back up the database before the first production deployment:
 
-- Change the default PostgreSQL password in a real deployment. The Compose credentials are intentionally simple for initial setup.
-- Keep `NUXT_SESSION_SECRET` private and long/random.
-- Back up both the PostgreSQL volume and the application data volume containing uploaded photos.
-- The public map currently uses the standard OpenStreetMap tile endpoint. That is suitable for development/light use. For significant public traffic, use an appropriate tile provider or host tiles according to OpenStreetMap's tile usage policy.
-- For tens of thousands of points, the existing bounding-box query already prevents loading the entire database. Marker clustering/vector tiles can be added when real data volume requires it.
-- Manual location CRUD currently preserves imported photos but manual photo upload is intentionally left for the next iteration.
-
-## Health check
-
-```text
-GET /api/health
+```bash
+docker compose exec db pg_dump -U gis gis > gis-backup-before-v0.2.sql
 ```
 
-Or with a subpath deployment:
+For first local testing, a fresh database is recommended:
 
-```text
-GET /gis/api/health
+```bash
+docker compose down -v
+docker compose up -d --build
 ```
+
+Do **not** run `down -v` on production unless you intentionally want to delete database volumes.
+
+## Data visibility
+
+Public API intentionally returns only:
+
+- coordinates
+- photo
+- category
+- district
+- fiscal year (for filtering)
+
+It does not send `condition`, source filename, source row, import batch, or other internal metadata.

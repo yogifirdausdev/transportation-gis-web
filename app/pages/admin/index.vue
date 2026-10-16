@@ -1,37 +1,20 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth' })
-const { data, refresh } = await useFetch(useApiUrl('/api/admin/stats'))
+import { MapPin, Building2, Upload, Tags } from 'lucide-vue-next'
+definePageMeta({layout:'admin',middleware:'admin'})
+const {data}=await useFetch('/api/admin/dashboard')
+const cards=computed(()=>[
+  {label:'Total Locations',value:data.value?.locations||0,icon:MapPin},
+  {label:'Kecamatan Terisi',value:data.value?.districts||0,icon:Building2},
+  {label:'Import Batch',value:data.value?.imports||0,icon:Upload},
+  {label:'Kategori',value:data.value?.categories||0,icon:Tags}
+])
 </script>
-
 <template>
-  <div>
-    <div class="page-head">
-      <div><div class="eyebrow">Overview</div><h1>Dashboard GIS</h1><p>Ringkasan data dan aktivitas terbaru.</p></div>
-      <div style="display:flex;gap:8px"><NuxtLink class="btn" to="/">Lihat Map</NuxtLink><NuxtLink class="btn btn-primary" to="/admin/import">Bulk Import</NuxtLink></div>
+  <div class="space-y-6">
+    <UiPageHeader title="Dashboard" description="Ringkasan data Transportation GIS."/>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <UiCard v-for="c in cards" :key="c.label" class="p-5"><div class="flex items-start justify-between"><div><div class="text-sm text-slate-500">{{c.label}}</div><div class="mt-2 text-3xl font-bold tracking-tight">{{c.value}}</div></div><div class="rounded-xl bg-teal-50 p-2.5 text-teal-700"><component :is="c.icon" class="h-5 w-5"/></div></div></UiCard>
     </div>
-    <div class="grid-stats">
-      <div class="stat-card"><span>Total titik</span><strong>{{ data?.summary?.total || 0 }}</strong></div>
-      <div class="stat-card"><span>Baik</span><strong>{{ data?.summary?.good || 0 }}</strong></div>
-      <div class="stat-card"><span>Tidak baik</span><strong>{{ data?.summary?.bad || 0 }}</strong></div>
-      <div class="stat-card"><span>Belum dinilai</span><strong>{{ data?.summary?.unassessed || 0 }}</strong></div>
-      <div class="stat-card"><span>Kecamatan</span><strong>{{ data?.summary?.districts || 0 }}</strong></div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h2>Data terbaru</h2><NuxtLink class="btn btn-sm" to="/admin/locations">Semua lokasi →</NuxtLink></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Lokasi</th><th>Kategori</th><th>Kecamatan</th><th>Kondisi</th><th>Ditambahkan</th></tr></thead>
-          <tbody>
-            <tr v-for="item in data?.recent || []" :key="item.id">
-              <td><div class="table-title">{{ item.name }}</div></td>
-              <td>{{ item.category_name }}</td><td>{{ item.district || '—' }}</td>
-              <td><StatusBadge :status="item.condition" /></td>
-              <td>{{ new Date(item.created_at).toLocaleDateString('id-ID') }}</td>
-            </tr>
-            <tr v-if="!data?.recent?.length"><td colspan="5" class="empty">Belum ada data. Mulai dari Bulk Import atau tambah lokasi manual.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <UiCard class="overflow-hidden"><div class="border-b px-5 py-4"><h2 class="font-semibold">Quick actions</h2></div><div class="grid gap-3 p-5 md:grid-cols-3"><NuxtLink to="/admin/locations/new" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Tambah Location</div><p class="mt-1 text-sm text-slate-500">Input satu titik secara manual.</p></NuxtLink><NuxtLink to="/admin/imports" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Bulk Import</div><p class="mt-1 text-sm text-slate-500">Preview dan import template Excel standar.</p></NuxtLink><NuxtLink to="/admin/categories" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Edit Marker Color</div><p class="mt-1 text-sm text-slate-500">Atur warna setiap kategori.</p></NuxtLink></div></UiCard>
   </div>
 </template>

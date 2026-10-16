@@ -2,5 +2,8 @@ node_modules
 .nuxt
 .output
 .env
-data
-*.log
+.DS_Store
+storage/uploads/*
+storage/imports/tmp/*
+!storage/uploads/.gitkeep
+!storage/imports/tmp/.gitkeep

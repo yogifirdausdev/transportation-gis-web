@@ -1,0 +1,11 @@
+services:
+  app:
+    container_name: gis-app
+    networks:
+      - gis
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-proxy}
