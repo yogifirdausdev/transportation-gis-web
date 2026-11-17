@@ -43,6 +43,7 @@ export default defineNitroPlugin(async () => {
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text UNIQUE NOT NULL,
     color text NOT NULL DEFAULT '#0F766E',
+    icon_key text NOT NULL DEFAULT 'map-pin',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   )`)
@@ -65,7 +66,8 @@ export default defineNitroPlugin(async () => {
     category_id uuid NOT NULL REFERENCES categories(id),
     district_id uuid REFERENCES districts(id),
     district_raw text,
-    fiscal_year integer NOT NULL,
+    fiscal_year integer,
+    implementation_status text NOT NULL DEFAULT 'EXISTING' CHECK (implementation_status IN ('EXISTING','PLANNED')),
     latitude double precision NOT NULL,
     longitude double precision NOT NULL,
     geom geometry(Point,4326),
@@ -83,6 +85,7 @@ export default defineNitroPlugin(async () => {
   )`)
   // Additive compatibility for earlier prototype schemas.
   await q("ALTER TABLE categories ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '#0F766E'")
+  await q("ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_key text NOT NULL DEFAULT 'map-pin'")
   await q("ALTER TABLE categories ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()")
   await q("ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()")
   await q("UPDATE categories SET color='#0F766E' WHERE color IS NULL OR color=''")
@@ -92,6 +95,7 @@ export default defineNitroPlugin(async () => {
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS district_id uuid REFERENCES districts(id)')
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS district_raw text')
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS fiscal_year integer')
+  await q("ALTER TABLE locations ADD COLUMN IF NOT EXISTS implementation_status text NOT NULL DEFAULT 'EXISTING'")
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS latitude double precision')
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS longitude double precision')
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS geom geometry(Point,4326)')
@@ -107,6 +111,13 @@ export default defineNitroPlugin(async () => {
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()')
   await q('ALTER TABLE locations ADD COLUMN IF NOT EXISTS deleted_at timestamptz')
   await q('ALTER TABLE locations ALTER COLUMN district_id DROP NOT NULL')
+  await q('ALTER TABLE locations ALTER COLUMN fiscal_year DROP NOT NULL')
+  await q("UPDATE locations SET implementation_status='EXISTING' WHERE implementation_status IS NULL OR implementation_status NOT IN ('EXISTING','PLANNED')")
+  await q(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='locations_implementation_status_check') THEN
+      ALTER TABLE locations ADD CONSTRAINT locations_implementation_status_check CHECK (implementation_status IN ('EXISTING','PLANNED'));
+    END IF;
+  END $$`)
 
   // Best-effort migration from common v0.1 prototype column names.
   await q(`DO $$ BEGIN
@@ -124,9 +135,9 @@ export default defineNitroPlugin(async () => {
     END IF;
   END $$`)
   await q(`UPDATE locations l SET district_id=d.id, district_raw=NULL FROM districts d WHERE l.district_id IS NULL AND l.district_raw IS NOT NULL AND lower(trim(l.district_raw))=lower(d.name)`)
-  await q(`UPDATE locations SET fiscal_year=EXTRACT(YEAR FROM COALESCE(created_at,now()))::int WHERE fiscal_year IS NULL`)
   await q('CREATE INDEX IF NOT EXISTS locations_geom_idx ON locations USING gist(geom)')
   await q('CREATE INDEX IF NOT EXISTS locations_active_idx ON locations(deleted_at, category_id, district_id, fiscal_year)')
+  await q('CREATE INDEX IF NOT EXISTS locations_status_idx ON locations(deleted_at, implementation_status)')
 
   await q(`CREATE OR REPLACE FUNCTION locations_set_geom() RETURNS trigger AS $$
     BEGIN
@@ -140,7 +151,7 @@ export default defineNitroPlugin(async () => {
 
   for (const name of districts) await q('INSERT INTO districts(name) VALUES($1) ON CONFLICT(name) DO NOTHING', [name])
   await q(`UPDATE locations l SET district_id=d.id, district_raw=NULL FROM districts d WHERE l.district_id IS NULL AND l.district_raw IS NOT NULL AND lower(trim(l.district_raw))=lower(d.name)`)
-  await q(`INSERT INTO categories(name,color) VALUES('Speed Bump','#F59E0B') ON CONFLICT(name) DO NOTHING`)
+  await q(`INSERT INTO categories(name,color,icon_key) VALUES('Speed Bump','#F59E0B','traffic-cone') ON CONFLICT(name) DO NOTHING`)
 
   const config = useRuntimeConfig()
   if (config.adminEmail && config.adminPassword) {

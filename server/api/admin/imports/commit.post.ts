@@ -30,9 +30,9 @@ export default defineEventHandler(async (event) => {
         photoPath = await saveUpload(row.photo.buffer, `excel-row-${row.rowNumber}.${ext}`, `batch-${batchId}`)
       }
       await client.query(`
-        INSERT INTO locations(location_name,category_id,district_id,district_raw,fiscal_year,latitude,longitude,condition,photo_path,source_type,source_file_name,source_row,import_batch_id,created_by)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'excel',$10,$11,$12,$13)
-      `,[row.locationName,row.categoryId,row.districtId || null,row.districtRaw || null,row.fiscalYear,row.latitude,row.longitude,row.normalizedCondition || 'Belum Dinilai',photoPath,originalName,row.rowNumber,batchId,user.id])
+        INSERT INTO locations(location_name,category_id,district_id,district_raw,fiscal_year,implementation_status,latitude,longitude,condition,photo_path,source_type,source_file_name,source_row,import_batch_id,created_by)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'excel',$11,$12,$13,$14)
+      `,[row.locationName,row.categoryId,row.districtId || null,row.districtRaw || null,row.fiscalYear,row.normalizedImplementationStatus,row.latitude,row.longitude,row.normalizedCondition || 'Belum Dinilai',photoPath,originalName,row.rowNumber,batchId,user.id])
       imported++
     }
     await client.query('UPDATE import_batches SET imported_rows=$1 WHERE id=$2',[imported,batchId])

@@ -41,3 +41,31 @@
 .leaflet-popup-content {
   margin: 14px 16px;
 }
+
+.gis-marker-host {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.gis-marker {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  box-sizing: border-box;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.22);
+}
+
+.gis-marker--existing {
+  color: #fff;
+  background: var(--marker-color);
+  border: 3px solid #fff;
+}
+
+.gis-marker--planned {
+  color: var(--marker-color);
+  background: rgba(255, 255, 255, 0.96);
+  border: 3px dashed var(--marker-color);
+}

@@ -1,8 +1,8 @@
-# Transportation GIS v0.2
+# Transportation GIS v0.3
 
 Standalone GIS web application for managing and publishing transportation facility points. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
 
-## v0.2 scope
+## v0.3 scope
 
 - Transit Teal UI refresh based on shadcn UI patterns
 - Resilient public Leaflet map lifecycle
@@ -10,9 +10,10 @@ Standalone GIS web application for managing and publishing transportation facili
 - Public popup: photo, category, district, coordinates
 - Admin-only condition and source metadata
 - 44 DKI Jakarta districts as application master data
-- Location fiscal year (`Tahun Anggaran`)
+- Optional location fiscal year (`Tahun Anggaran`)
+- Implementation status: `EXISTING` / `PLANNED`
 - Single photo per location
-- Category marker color can be edited after category creation
+- Category marker color and icon can be edited after category creation
 - Standard Excel template import
 - Import preview with `Valid`, `Warning`, and `Will not import` rows plus reasons
 - Source tracking: Manual or Excel filename + source row + import batch
@@ -57,19 +58,20 @@ Open:
 
 Download from the application or directly from:
 
-`/templates/Template_Import_Transportation_GIS_v0.2.xlsx`
+`/templates/Template_Import_Transportation_GIS_v0.3.xlsx`
 
 The `Template Import` sheet uses one row per GIS point:
 
 | Column | Required | Notes |
 | --- | --- | --- |
 | No | No | Sequence only |
-| Tahun Anggaran | Yes | Example: `2026` |
+| Tahun Anggaran | No | Optional. Example: `2027` |
 | Kecamatan | Yes | Plain text. Validated against the application's district master |
 | Lokasi Kegiatan | Yes | Internal/admin location name |
 | Latitude | Yes | Jakarta should be negative, e.g. `-6.1433398` |
 | Longitude | Yes | e.g. `106.7850379` |
 | Kategori | Yes | e.g. `Speed Bump` |
+| Status | No | `Eksisting` or `Direncanakan`. Blank defaults to `Eksisting` |
 | Kondisi | No | Internal only. Unknown/blank values become `Belum Dinilai` with warning |
 | Foto | No | One embedded photo per row |
 
@@ -125,15 +127,15 @@ Caddy and `gis-app` must share the same Docker network.
 Test this version in a separate folder first. Before overwriting your existing repository:
 
 ```bash
-git switch -c backup/pre-v0.2
-git push -u origin backup/pre-v0.2
+git switch -c backup/pre-v0.3
+git push -u origin backup/pre-v0.3
 git switch main
 ```
 
 Then copy the new source while preserving `.git` and `.env`, for example:
 
 ```bash
-rsync -av --delete --exclude='.git' --exclude='.env' /path/to/transportation-gis-v0.2/ /path/to/current-repo/
+rsync -av --delete --exclude='.git' --exclude='.env' /path/to/transportation-gis-v0.3/ /path/to/current-repo/
 ```
 
 Review:
@@ -146,15 +148,15 @@ git diff --stat
 Suggested commit:
 
 ```text
-feat: implement Transportation GIS v0.2
+feat: implement Transportation GIS v0.3
 ```
 
 ## Database upgrade warning
 
-v0.2 bootstraps its schema automatically using `CREATE TABLE IF NOT EXISTS` and additive setup. However, if your previous prototype used materially different table definitions, back up the database before the first production deployment:
+v0.3 bootstraps its schema automatically using `CREATE TABLE IF NOT EXISTS` and additive setup. However, if your previous prototype used materially different table definitions, back up the database before the first production deployment:
 
 ```bash
-docker compose exec db pg_dump -U gis gis > gis-backup-before-v0.2.sql
+docker compose exec db pg_dump -U gis gis > gis-backup-before-v0.3.sql
 ```
 
 For first local testing, a fresh database is recommended:
@@ -175,5 +177,7 @@ Public API intentionally returns only:
 - category
 - district
 - fiscal year (for filtering)
+- implementation status
+- category icon key
 
 It does not send `condition`, source filename, source row, import batch, or other internal metadata.

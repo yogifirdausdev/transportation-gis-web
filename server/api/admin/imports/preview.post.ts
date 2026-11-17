@@ -37,6 +37,7 @@ export default defineEventHandler(async (event) => {
       longitude:r.longitude,
       categoryName:r.categoryName,
       condition:r.normalizedCondition,
+      implementationStatus:r.normalizedImplementationStatus,
       hasPhoto:!!r.photo,
       status:r.status,
       reasons:r.reasons

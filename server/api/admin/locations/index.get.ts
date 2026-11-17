@@ -10,10 +10,11 @@ export default defineEventHandler(async (event) => {
   if (query.category) { params.push(String(query.category)); where.push(`l.category_id=$${params.length}`) }
   if (query.district) { params.push(String(query.district)); where.push(`l.district_id=$${params.length}`) }
   if (query.year) { params.push(Number(query.year)); where.push(`l.fiscal_year=$${params.length}`) }
+  if (query.status) { params.push(String(query.status)); where.push(`l.implementation_status=$${params.length}`) }
   const r = await q(`
-    SELECT l.id,l.location_name,l.fiscal_year,l.latitude,l.longitude,l.condition,l.photo_path,
+    SELECT l.id,l.location_name,l.fiscal_year,l.implementation_status,l.latitude,l.longitude,l.condition,l.photo_path,
            l.source_type,l.source_file_name,l.source_row,l.import_batch_id,l.created_at,l.updated_at,
-           c.id category_id,c.name category,c.color category_color,
+           c.id category_id,c.name category,c.color category_color,c.icon_key category_icon_key,
            d.id district_id,COALESCE(d.name,l.district_raw) district
     FROM locations l
     JOIN categories c ON c.id=l.category_id

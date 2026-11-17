@@ -9,6 +9,7 @@ type ParsedRow = {
   latitude: number | null
   longitude: number | null
   categoryName: string
+  implementationStatus: string | null
   condition: string | null
   photo?: { buffer: Buffer; extension: string }
 }
@@ -20,6 +21,7 @@ export type PreviewRow = ParsedRow & {
   districtRaw?: string | null
   categoryId?: string
   normalizedCondition?: string | null
+  normalizedImplementationStatus: 'EXISTING' | 'PLANNED'
 }
 
 const conditionMap: Record<string, string> = {
@@ -30,6 +32,14 @@ const conditionMap: Record<string, string> = {
   'tidak baik/tidak sesuai': 'Tidak Baik / Tidak Sesuai',
   'tidak baik': 'Tidak Baik / Tidak Sesuai',
   'belum dinilai': 'Belum Dinilai'
+}
+
+const implementationStatusMap: Record<string, 'EXISTING' | 'PLANNED'> = {
+  existing: 'EXISTING',
+  eksisting: 'EXISTING',
+  planned: 'PLANNED',
+  direncanakan: 'PLANNED',
+  rencana: 'PLANNED'
 }
 
 function text(v: any) {
@@ -62,7 +72,7 @@ export async function parseWorkbook(buffer: Buffer) {
 
   const headers = new Map<string, number>()
   ws.getRow(1).eachCell((cell, col) => headers.set(text(cell.value).toLowerCase(), col))
-  const required = ['tahun anggaran','kecamatan','lokasi kegiatan','latitude','longitude','kategori']
+  const required = ['kecamatan','lokasi kegiatan','latitude','longitude','kategori']
   for (const h of required) if (!headers.has(h)) throw new Error(`Kolom wajib tidak ditemukan: ${h}`)
 
   const imageByRow = new Map<number, { buffer: Buffer; extension: string }>()
@@ -82,19 +92,21 @@ export async function parseWorkbook(buffer: Buffer) {
     const district = text(row.getCell(headers.get('kecamatan')!).value)
     const lat = num(row.getCell(headers.get('latitude')!).value)
     const lng = num(row.getCell(headers.get('longitude')!).value)
-    const year = num(row.getCell(headers.get('tahun anggaran')!).value)
+    const year = headers.get('tahun anggaran') ? num(row.getCell(headers.get('tahun anggaran')!).value) : null
     const category = text(row.getCell(headers.get('kategori')!).value)
+    const implementationStatus = headers.get('status') ? text(row.getCell(headers.get('status')!).value) : ''
     const condition = headers.get('kondisi') ? text(row.getCell(headers.get('kondisi')!).value) : ''
-    const anyData = location || district || lat !== null || lng !== null || year !== null || category
+    const anyData = location || district || lat !== null || lng !== null || year !== null || category || implementationStatus || condition
     if (!anyData) continue
     rows.push({
       rowNumber: r,
-      fiscalYear: year ? Math.trunc(year) : null,
+      fiscalYear: year == null ? null : Math.trunc(year),
       districtName: district,
       locationName: location,
       latitude: lat,
       longitude: lng,
       categoryName: category,
+      implementationStatus: implementationStatus || null,
       condition: condition || null,
       photo: imageByRow.get(r)
     })
@@ -115,13 +127,20 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
     const district = districtMap.get(row.districtName.trim().toLowerCase()) as any
     const category = categoryMap.get(row.categoryName.trim().toLowerCase()) as any
 
-    if (!row.fiscalYear || row.fiscalYear < 2000 || row.fiscalYear > 2100) { status='skip'; reasons.push('Tahun Anggaran tidak valid') }
+    if (row.fiscalYear != null && (row.fiscalYear < 2000 || row.fiscalYear > 2100)) { status='skip'; reasons.push('Tahun Anggaran tidak valid') }
     if (!row.districtName) { status='skip'; reasons.push('Kecamatan kosong') }
     else if (!district && status !== 'skip') { status='warning'; reasons.push(`Kecamatan "${row.districtName}" tidak dikenali. Data tetap diimport sebagai draft internal dan tidak tampil di peta publik sampai diperbaiki dari Edit Location.`) }
     if (!row.locationName) { status='skip'; reasons.push('Lokasi Kegiatan kosong') }
     if (row.latitude == null || row.latitude < -90 || row.latitude > 90) { status='skip'; reasons.push('Latitude tidak valid') }
     if (row.longitude == null || row.longitude < -180 || row.longitude > 180) { status='skip'; reasons.push('Longitude tidak valid') }
     if (!category) { status='skip'; reasons.push(`Kategori "${row.categoryName || '-'}" tidak dikenali`) }
+
+    let normalizedImplementationStatus: 'EXISTING' | 'PLANNED' = 'EXISTING'
+    if (row.implementationStatus) {
+      const mapped = implementationStatusMap[row.implementationStatus.trim().toLowerCase()]
+      if (mapped) normalizedImplementationStatus = mapped
+      else { status='skip'; reasons.push(`Status "${row.implementationStatus}" tidak dikenali. Gunakan Eksisting atau Direncanakan.`) }
+    }
 
     let normalizedCondition: string | null = 'Belum Dinilai'
     if (row.condition) {
@@ -139,7 +158,7 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
       }
     }
 
-    out.push({ ...row, status, reasons, districtId: district?.id, districtRaw: district ? null : (row.districtName || null), categoryId: category?.id, normalizedCondition })
+    out.push({ ...row, status, reasons, districtId: district?.id, districtRaw: district ? null : (row.districtName || null), categoryId: category?.id, normalizedCondition, normalizedImplementationStatus })
   }
   return out
 }

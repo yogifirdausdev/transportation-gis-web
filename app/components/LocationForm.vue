@@ -8,7 +8,8 @@ const form=reactive({
   location_name:props.model?.location_name||'',
   category_id:props.model?.category_id||'',
   district_id:props.model?.district_id||'',
-  fiscal_year:props.model?.fiscal_year||new Date().getFullYear(),
+  fiscal_year:props.model?.fiscal_year ?? '',
+  implementation_status:props.model?.implementation_status||'EXISTING',
   latitude:props.model?.latitude ?? null,
   longitude:props.model?.longitude ?? null,
   condition:props.model?.condition||'Belum Dinilai'
@@ -23,7 +24,8 @@ function submit(){const fd=new FormData();Object.entries(form).forEach(([k,v])=>
       <div class="space-y-2 md:col-span-2"><UiLabel>Lokasi Kegiatan</UiLabel><UiInput v-model="form.location_name" placeholder="Nama/alamat lokasi"/></div>
       <div class="space-y-2"><UiLabel>Kategori</UiLabel><UiSelect v-model="form.category_id"><option value="" disabled>Pilih kategori</option><option v-for="c in cats?.categories||[]" :key="c.id" :value="c.id">{{c.name}}</option></UiSelect></div>
       <div class="space-y-2"><UiLabel>Kecamatan</UiLabel><div v-if="model?.district_raw && !form.district_id" class="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">Nilai dari Excel tidak dikenali: <strong>{{model.district_raw}}</strong>. Pilih kecamatan yang benar sebelum menyimpan.</div><UiSelect v-model="form.district_id"><option value="" disabled>Pilih kecamatan</option><option v-for="d in dists?.districts||[]" :key="d.id" :value="d.id">{{d.name}}</option></UiSelect></div>
-      <div class="space-y-2"><UiLabel>Tahun Anggaran</UiLabel><UiInput v-model="form.fiscal_year" type="number" min="2000" max="2100"/></div>
+      <div class="space-y-2"><UiLabel>Status</UiLabel><UiSelect v-model="form.implementation_status"><option value="EXISTING">Eksisting</option><option value="PLANNED">Direncanakan</option></UiSelect></div>
+      <div class="space-y-2"><UiLabel>Tahun Anggaran <span class="text-xs font-normal text-slate-400">(opsional)</span></UiLabel><UiInput v-model="form.fiscal_year" type="number" min="2000" max="2100" placeholder="Contoh: 2027"/></div>
       <div class="space-y-2"><UiLabel>Kondisi <span class="text-xs font-normal text-slate-400">(internal)</span></UiLabel><UiSelect v-model="form.condition"><option>Baik / Sesuai</option><option>Tidak Baik / Tidak Sesuai</option><option>Belum Dinilai</option></UiSelect></div>
       <div class="space-y-2"><UiLabel>Latitude</UiLabel><UiInput v-model="form.latitude" type="number" step="0.0000001"/></div>
       <div class="space-y-2"><UiLabel>Longitude</UiLabel><UiInput v-model="form.longitude" type="number" step="0.0000001"/></div>
