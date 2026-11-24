@@ -31,7 +31,7 @@ function safeColor(value: any) {
 }
 
 function statusLabel(value: any) {
-  return value === 'PLANNED' ? 'Direncanakan' : 'Eksisting'
+  return value === 'PLANNED' ? 'Direncanakan' : 'Terpasang'
 }
 
 function popupHtml(item: any) {
@@ -39,7 +39,7 @@ function popupHtml(item: any) {
     ? `<img src="${escapeHtml(item.photo_path)}" alt="Foto" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px" loading="lazy">`
     : ''
   const year = item.fiscal_year ? `<div><strong>Tahun Anggaran:</strong> ${escapeHtml(item.fiscal_year)}</div>` : ''
-  return `<div style="min-width:220px;max-width:280px">${photo}<div style="font-weight:700;margin-bottom:8px;color:#0f172a">${escapeHtml(item.category)}</div><div style="font-size:13px;line-height:1.75;color:#475569"><div><strong>Status:</strong> ${statusLabel(item.implementation_status)}</div><div><strong>Kecamatan:</strong> ${escapeHtml(item.district)}</div>${year}<div><strong>Koordinat:</strong> ${Number(item.latitude).toFixed(7)}, ${Number(item.longitude).toFixed(7)}</div></div></div>`
+  return `<div style="min-width:220px;max-width:280px">${photo}<div style="font-weight:700;margin-bottom:8px;color:#0f172a">${escapeHtml(item.category)}</div><div style="font-size:13px;line-height:1.75;color:#475569"><div><strong>Status:</strong> ${statusLabel(item.implementation_status)}</div><div><strong>Lokasi:</strong> ${escapeHtml(item.location_name)}</div><div><strong>Kecamatan:</strong> ${escapeHtml(item.district)}</div>${year}<div><strong>Koordinat:</strong> ${Number(item.latitude).toFixed(7)}, ${Number(item.longitude).toFixed(7)}</div></div></div>`
 }
 
 function markerHtml(item: any) {
@@ -85,7 +85,7 @@ async function loadMarkers() {
     }
     markerCount.value = data.locations?.length || 0
   } catch (e: any) {
-    if (e?.name !== 'AbortError') error.value = 'Data peta gagal dimuat. Coba geser/zoom peta atau refresh halaman.'
+    if (e?.name !== 'AbortError') error.value = 'Data peta gagal dimuat. Coba geser/zoom peta atau muat ulang halaman.'
   } finally {
     if (aborter === controller) loading.value = false
   }
@@ -112,7 +112,7 @@ async function init() {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map)
-  tiles.on('tileerror', () => { error.value = 'Basemap sedang gagal dimuat. Marker/data masih dapat tersedia.' })
+  tiles.on('tileerror', () => { error.value = 'Peta dasar sedang gagal dimuat. Marker dan data masih dapat tersedia.' })
   map.on('moveend', scheduleLoad)
   observer = new ResizeObserver(() => {
     if (map) requestAnimationFrame(() => map.invalidateSize({ animate: false }))
@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
     <div ref="mapEl" class="absolute inset-0" />
     <div class="pointer-events-none absolute bottom-4 left-4 z-[500] flex items-center gap-2 rounded-full border bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-soft backdrop-blur">
       <Loader2 v-if="loading" class="h-3.5 w-3.5 animate-spin text-teal-700" />
-      <span>{{ loading ? 'Memuat data...' : `${markerCount} titik pada viewport` }}</span>
+      <span>{{ loading ? 'Memuat data...' : `${markerCount} titik pada area peta` }}</span>
     </div>
     <div v-if="error" class="absolute right-4 top-4 z-[500] flex max-w-sm gap-2 rounded-xl border border-amber-200 bg-amber-50/95 p-3 text-sm text-amber-900 shadow-soft">
       <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" /><span>{{ error }}</span>

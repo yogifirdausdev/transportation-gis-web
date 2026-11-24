@@ -49,7 +49,7 @@ export async function getSessionUser(event: H3Event) {
 
 export async function requireUser(event: H3Event, roles?: string[]) {
   const user = await getSessionUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
-  if (roles && !roles.includes(user.role)) throw createError({ statusCode: 403, statusMessage: 'Insufficient permission' })
+  if (!user) throw createError({ statusCode: 401, statusMessage: 'Autentikasi diperlukan' })
+  if (roles && !roles.includes(user.role)) throw createError({ statusCode: 403, statusMessage: 'Hak akses tidak mencukupi' })
   return user
 }

@@ -8,9 +8,9 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const token = String(body?.token || '')
   const skipDuplicates = body?.skipDuplicates !== false
-  if (!token) throw createError({ statusCode:400, statusMessage:'Preview token tidak valid' })
+  if (!token) throw createError({ statusCode:400, statusMessage:'Token pratinjau tidak valid' })
   const temp = await findTempImport(token)
-  if (!temp) throw createError({ statusCode:400, statusMessage:'File preview sudah tidak tersedia. Upload ulang file.' })
+  if (!temp) throw createError({ statusCode:400, statusMessage:'File pratinjau sudah tidak tersedia. Unggah ulang file.' })
   const originalName = temp.filename.replace(`${token}-`, '')
   const parsed = await parseWorkbook(temp.buffer)
   const rows = await validateRows(parsed, skipDuplicates)

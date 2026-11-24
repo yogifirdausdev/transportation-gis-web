@@ -1,0 +1,881 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5a00404..73ed445 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,16 @@
+ # Changelog
+ 
++## 0.3.1
++
++- Renamed the application to **Peta Perlengkapan Jalan**
++- Changed the visible `Eksisting` label to **Terpasang** while keeping internal `EXISTING` values for compatibility
++- Added `Lokasi` to public marker popups
++- Restricted public `Tahun Anggaran` data and year filtering to authenticated users
++- Added a dedicated Speed Bump marker icon
++- Replaced text-based category icon selects with a visual icon picker
++- Localized the main admin/public interface to Bahasa Indonesia while keeping Dashboard and Users
++- Updated Excel template wording to use **Terpasang** and kept legacy **Eksisting** import compatibility
++
+ ## 0.3.0
+ 
+ - Added selectable icon per category
+diff --git a/README.md b/README.md
+index 23939b5..aa5ff1d 100644
+--- a/README.md
++++ b/README.md
+@@ -1,21 +1,21 @@
+-# Transportation GIS v0.3
++# Peta Perlengkapan Jalan v0.3.1
+ 
+-Standalone GIS web application for managing and publishing transportation facility points. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
++Aplikasi GIS mandiri untuk mengelola dan memublikasikan titik perlengkapan jalan dan fasilitas transportasi. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
+ 
+-## v0.3 scope
++## Cakupan v0.3.1
+ 
+ - Transit Teal UI refresh based on shadcn UI patterns
+ - Resilient public Leaflet map lifecycle
+ - Public/Admin field separation
+-- Public popup: photo, category, district, coordinates
++- Popup peta: foto, kategori, lokasi, kecamatan, koordinat; Tahun Anggaran hanya untuk user login
+ - Admin-only condition and source metadata
+ - 44 DKI Jakarta districts as application master data
+ - Optional location fiscal year (`Tahun Anggaran`)
+-- Implementation status: `EXISTING` / `PLANNED`
++- Status implementasi internal: `EXISTING` / `PLANNED`, ditampilkan sebagai `Terpasang` / `Direncanakan`
+ - Single photo per location
+-- Category marker color and icon can be edited after category creation
++- Warna dan ikon marker kategori dapat diedit; pemilihan ikon menggunakan visual icon picker
+ - Standard Excel template import
+-- Import preview with `Valid`, `Warning`, and `Will not import` rows plus reasons
++- Pratinjau impor dengan status `Valid`, `Peringatan`, dan `Tidak Diimpor` beserta alasan
+ - Source tracking: Manual or Excel filename + source row + import batch
+ - Import history and safe rollback
+ - DB-backed admin session designed to work behind Caddy
+@@ -71,7 +71,7 @@ The `Template Import` sheet uses one row per GIS point:
+ | Latitude | Yes | Jakarta should be negative, e.g. `-6.1433398` |
+ | Longitude | Yes | e.g. `106.7850379` |
+ | Kategori | Yes | e.g. `Speed Bump` |
+-| Status | No | `Eksisting` or `Direncanakan`. Blank defaults to `Eksisting` |
++| Status | No | `Terpasang` atau `Direncanakan`. Kosong dianggap `Terpasang`. Nilai lama `Eksisting` tetap diterima |
+ | Kondisi | No | Internal only. Unknown/blank values become `Belum Dinilai` with warning |
+ | Foto | No | One embedded photo per row |
+ 
+@@ -148,7 +148,7 @@ git diff --stat
+ Suggested commit:
+ 
+ ```text
+-feat: implement Transportation GIS v0.3
++feat: revise public visibility and Indonesian UI
+ ```
+ 
+ ## Database upgrade warning
+@@ -176,8 +176,9 @@ Public API intentionally returns only:
+ - photo
+ - category
+ - district
+-- fiscal year (for filtering)
++- fiscal year only when the requester has an authenticated session
+ - implementation status
++- location name
+ - category icon key
+ 
+ It does not send `condition`, source filename, source row, import batch, or other internal metadata.
+diff --git a/app/components/LocationForm.vue b/app/components/LocationForm.vue
+index 81a3203..a543778 100644
+--- a/app/components/LocationForm.vue
++++ b/app/components/LocationForm.vue
+@@ -24,13 +24,13 @@ function submit(){const fd=new FormData();Object.entries(form).forEach(([k,v])=>
+       <div class="space-y-2 md:col-span-2"><UiLabel>Lokasi Kegiatan</UiLabel><UiInput v-model="form.location_name" placeholder="Nama/alamat lokasi"/></div>
+       <div class="space-y-2"><UiLabel>Kategori</UiLabel><UiSelect v-model="form.category_id"><option value="" disabled>Pilih kategori</option><option v-for="c in cats?.categories||[]" :key="c.id" :value="c.id">{{c.name}}</option></UiSelect></div>
+       <div class="space-y-2"><UiLabel>Kecamatan</UiLabel><div v-if="model?.district_raw && !form.district_id" class="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">Nilai dari Excel tidak dikenali: <strong>{{model.district_raw}}</strong>. Pilih kecamatan yang benar sebelum menyimpan.</div><UiSelect v-model="form.district_id"><option value="" disabled>Pilih kecamatan</option><option v-for="d in dists?.districts||[]" :key="d.id" :value="d.id">{{d.name}}</option></UiSelect></div>
+-      <div class="space-y-2"><UiLabel>Status</UiLabel><UiSelect v-model="form.implementation_status"><option value="EXISTING">Eksisting</option><option value="PLANNED">Direncanakan</option></UiSelect></div>
++      <div class="space-y-2"><UiLabel>Status</UiLabel><UiSelect v-model="form.implementation_status"><option value="EXISTING">Terpasang</option><option value="PLANNED">Direncanakan</option></UiSelect></div>
+       <div class="space-y-2"><UiLabel>Tahun Anggaran <span class="text-xs font-normal text-slate-400">(opsional)</span></UiLabel><UiInput v-model="form.fiscal_year" type="number" min="2000" max="2100" placeholder="Contoh: 2027"/></div>
+       <div class="space-y-2"><UiLabel>Kondisi <span class="text-xs font-normal text-slate-400">(internal)</span></UiLabel><UiSelect v-model="form.condition"><option>Baik / Sesuai</option><option>Tidak Baik / Tidak Sesuai</option><option>Belum Dinilai</option></UiSelect></div>
+       <div class="space-y-2"><UiLabel>Latitude</UiLabel><UiInput v-model="form.latitude" type="number" step="0.0000001"/></div>
+       <div class="space-y-2"><UiLabel>Longitude</UiLabel><UiInput v-model="form.longitude" type="number" step="0.0000001"/></div>
+       <div class="space-y-2 md:col-span-2"><UiLabel>Foto</UiLabel><label class="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-slate-50 p-4 text-sm text-slate-600 hover:bg-slate-100"><ImagePlus class="h-5 w-5 text-teal-700"/><span>{{file?.name||'Pilih satu foto'}}</span><input type="file" accept="image/*" class="hidden" @change="onFile"></label><img v-if="preview" :src="preview" class="mt-3 h-44 w-full rounded-xl object-cover"></div>
+-    </div><div class="mt-6 flex justify-end"><UiButton type="submit"><Save class="h-4 w-4"/>{{submitLabel||'Simpan Location'}}</UiButton></div></UiCard>
+-    <div class="space-y-4"><MapPicker v-model:lat="form.latitude" v-model:lng="form.longitude"/><div v-if="model?.source_type" class="rounded-xl border bg-white p-4 text-sm"><div class="font-medium text-slate-900">Sumber data</div><div class="mt-2 text-slate-600"><template v-if="model.source_type==='excel'">Excel: <span class="font-medium">{{model.source_file_name}}</span><span v-if="model.source_row"> · Row {{model.source_row}}</span></template><template v-else>Ditambahkan manual</template></div></div></div>
++    </div><div class="mt-6 flex justify-end"><UiButton type="submit"><Save class="h-4 w-4"/>{{submitLabel||'Simpan Lokasi'}}</UiButton></div></UiCard>
++    <div class="space-y-4"><MapPicker v-model:lat="form.latitude" v-model:lng="form.longitude"/><div v-if="model?.source_type" class="rounded-xl border bg-white p-4 text-sm"><div class="font-medium text-slate-900">Sumber data</div><div class="mt-2 text-slate-600"><template v-if="model.source_type==='excel'">Excel: <span class="font-medium">{{model.source_file_name}}</span><span v-if="model.source_row"> · Baris {{model.source_row}}</span></template><template v-else>Ditambahkan manual</template></div></div></div>
+   </form>
+ </template>
+diff --git a/app/components/PublicMap.vue b/app/components/PublicMap.vue
+index 3e8cdb1..6622155 100644
+--- a/app/components/PublicMap.vue
++++ b/app/components/PublicMap.vue
+@@ -31,7 +31,7 @@ function safeColor(value: any) {
+ }
+ 
+ function statusLabel(value: any) {
+-  return value === 'PLANNED' ? 'Direncanakan' : 'Eksisting'
++  return value === 'PLANNED' ? 'Direncanakan' : 'Terpasang'
+ }
+ 
+ function popupHtml(item: any) {
+@@ -39,7 +39,7 @@ function popupHtml(item: any) {
+     ? `<img src="${escapeHtml(item.photo_path)}" alt="Foto" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px" loading="lazy">`
+     : ''
+   const year = item.fiscal_year ? `<div><strong>Tahun Anggaran:</strong> ${escapeHtml(item.fiscal_year)}</div>` : ''
+-  return `<div style="min-width:220px;max-width:280px">${photo}<div style="font-weight:700;margin-bottom:8px;color:#0f172a">${escapeHtml(item.category)}</div><div style="font-size:13px;line-height:1.75;color:#475569"><div><strong>Status:</strong> ${statusLabel(item.implementation_status)}</div><div><strong>Kecamatan:</strong> ${escapeHtml(item.district)}</div>${year}<div><strong>Koordinat:</strong> ${Number(item.latitude).toFixed(7)}, ${Number(item.longitude).toFixed(7)}</div></div></div>`
++  return `<div style="min-width:220px;max-width:280px">${photo}<div style="font-weight:700;margin-bottom:8px;color:#0f172a">${escapeHtml(item.category)}</div><div style="font-size:13px;line-height:1.75;color:#475569"><div><strong>Status:</strong> ${statusLabel(item.implementation_status)}</div><div><strong>Lokasi:</strong> ${escapeHtml(item.location_name)}</div><div><strong>Kecamatan:</strong> ${escapeHtml(item.district)}</div>${year}<div><strong>Koordinat:</strong> ${Number(item.latitude).toFixed(7)}, ${Number(item.longitude).toFixed(7)}</div></div></div>`
+ }
+ 
+ function markerHtml(item: any) {
+@@ -85,7 +85,7 @@ async function loadMarkers() {
+     }
+     markerCount.value = data.locations?.length || 0
+   } catch (e: any) {
+-    if (e?.name !== 'AbortError') error.value = 'Data peta gagal dimuat. Coba geser/zoom peta atau refresh halaman.'
++    if (e?.name !== 'AbortError') error.value = 'Data peta gagal dimuat. Coba geser/zoom peta atau muat ulang halaman.'
+   } finally {
+     if (aborter === controller) loading.value = false
+   }
+@@ -112,7 +112,7 @@ async function init() {
+     maxZoom: 19,
+     attribution: '&copy; OpenStreetMap contributors'
+   }).addTo(map)
+-  tiles.on('tileerror', () => { error.value = 'Basemap sedang gagal dimuat. Marker/data masih dapat tersedia.' })
++  tiles.on('tileerror', () => { error.value = 'Peta dasar sedang gagal dimuat. Marker dan data masih dapat tersedia.' })
+   map.on('moveend', scheduleLoad)
+   observer = new ResizeObserver(() => {
+     if (map) requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
+     <div ref="mapEl" class="absolute inset-0" />
+     <div class="pointer-events-none absolute bottom-4 left-4 z-[500] flex items-center gap-2 rounded-full border bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-soft backdrop-blur">
+       <Loader2 v-if="loading" class="h-3.5 w-3.5 animate-spin text-teal-700" />
+-      <span>{{ loading ? 'Memuat data...' : `${markerCount} titik pada viewport` }}</span>
++      <span>{{ loading ? 'Memuat data...' : `${markerCount} titik pada area peta` }}</span>
+     </div>
+     <div v-if="error" class="absolute right-4 top-4 z-[500] flex max-w-sm gap-2 rounded-xl border border-amber-200 bg-amber-50/95 p-3 text-sm text-amber-900 shadow-soft">
+       <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" /><span>{{ error }}</span>
+diff --git a/app/layouts/admin.vue b/app/layouts/admin.vue
+index a7f7a38..3d666ff 100644
+--- a/app/layouts/admin.vue
++++ b/app/layouts/admin.vue
+@@ -4,10 +4,10 @@ const route = useRoute()
+ const user = useState<any>('auth-user')
+ const items = computed(() => [
+   { to:'/admin', label:'Dashboard', icon:LayoutDashboard },
+-  { to:'/admin/locations', label:'Locations', icon:MapPinned },
+-  { to:'/admin/imports', label:'Bulk Import', icon:Upload },
+-  { to:'/admin/imports/history', label:'Import History', icon:History },
+-  ...(user.value?.role === 'admin' || user.value?.role === 'manager' ? [{ to:'/admin/categories', label:'Categories', icon:Tags }] : []),
++  { to:'/admin/locations', label:'Lokasi', icon:MapPinned },
++  { to:'/admin/imports', label:'Impor Massal', icon:Upload },
++  { to:'/admin/imports/history', label:'Riwayat Impor', icon:History },
++  ...(user.value?.role === 'admin' || user.value?.role === 'manager' ? [{ to:'/admin/categories', label:'Kategori', icon:Tags }] : []),
+   ...(user.value?.role === 'admin' ? [{ to:'/admin/users', label:'Users', icon:Users }] : [])
+ ])
+ async function logout(){ await $fetch('/api/auth/logout',{method:'POST'}); await navigateTo('/admin/login') }
+@@ -17,7 +17,7 @@ async function logout(){ await $fetch('/api/auth/logout',{method:'POST'}); await
+     <aside class="fixed inset-y-0 left-0 hidden w-64 border-r bg-white lg:block">
+       <div class="flex h-16 items-center gap-3 border-b px-5">
+         <div class="rounded-xl bg-teal-700 p-2 text-white"><Map class="h-5 w-5"/></div>
+-        <div><div class="font-bold text-slate-950">Transportation GIS</div><div class="text-xs text-slate-500">Administration</div></div>
++        <div><div class="font-bold text-slate-950">Peta Perlengkapan Jalan</div><div class="text-xs text-slate-500">Administrasi</div></div>
+       </div>
+       <nav class="space-y-1 p-3">
+         <NuxtLink v-for="item in items" :key="item.to" :to="item.to" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition" :class="route.path===item.to || (item.to!='/admin' && route.path.startsWith(item.to)) ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-100'">
+@@ -26,7 +26,7 @@ async function logout(){ await $fetch('/api/auth/logout',{method:'POST'}); await
+       </nav>
+       <div class="absolute bottom-0 w-full border-t p-4">
+         <div class="mb-3 min-w-0"><div class="truncate text-sm font-medium">{{ user?.name }}</div><div class="truncate text-xs text-slate-500">{{ user?.email }}</div></div>
+-        <UiButton variant="ghost" class="w-full justify-start" @click="logout"><LogOut class="h-4 w-4"/> Logout</UiButton>
++        <UiButton variant="ghost" class="w-full justify-start" @click="logout"><LogOut class="h-4 w-4"/> Keluar</UiButton>
+       </div>
+     </aside>
+     <div class="lg:pl-64">
+@@ -38,7 +38,7 @@ async function logout(){ await $fetch('/api/auth/logout',{method:'POST'}); await
+               <NuxtLink v-for="item in items" :key="item.to" :to="item.to" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-50"><component :is="item.icon" class="h-4 w-4"/>{{item.label}}</NuxtLink>
+             </div>
+           </details>
+-          <NuxtLink to="/" class="text-sm font-medium text-teal-700 hover:text-teal-900">← Public Map</NuxtLink>
++          <NuxtLink to="/" class="text-sm font-medium text-teal-700 hover:text-teal-900">← Peta Publik</NuxtLink>
+         </div>
+         <div class="text-sm capitalize text-slate-500">{{ user?.role }}</div>
+       </header>
+diff --git a/app/lib/marker-icons.ts b/app/lib/marker-icons.ts
+index 91c2cc7..c9eb98a 100644
+--- a/app/lib/marker-icons.ts
++++ b/app/lib/marker-icons.ts
+@@ -10,6 +10,11 @@ export const markerIconOptions: MarkerIconOption[] = [
+     label: 'Pin Lokasi',
+     body: '<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'
+   },
++  {
++    key: 'speed-bump',
++    label: 'Speed Bump',
++    body: '<path d="M3 17h3c1.4 0 2.1-7 6-7s4.6 7 6 7h3"/><path d="M3 20h18"/><path d="M9 14h6"/>'
++  },
+   {
+     key: 'camera',
+     label: 'Kamera / CCTV',
+@@ -17,12 +22,12 @@ export const markerIconOptions: MarkerIconOption[] = [
+   },
+   {
+     key: 'traffic-cone',
+-    label: 'Traffic Cone',
++    label: 'Kerucut Lalu Lintas',
+     body: '<path d="M10.83 2.38a2 2 0 0 1 2.34 0L19 20H5L10.83 2.38Z"/><path d="M8.5 8h7M7 13h10M3 20h18"/>'
+   },
+   {
+     key: 'signpost',
+-    label: 'Rambu / Signpost',
++    label: 'Rambu',
+     body: '<path d="M12 3v18M5 6h14l2 3-2 3H5L3 9l2-3Z"/>'
+   },
+   {
+diff --git a/app/pages/admin/categories/index.vue b/app/pages/admin/categories/index.vue
+index db7e800..33cac44 100644
+--- a/app/pages/admin/categories/index.vue
++++ b/app/pages/admin/categories/index.vue
+@@ -1,6 +1,5 @@
+ <script setup lang="ts">
+ import { Plus, Save, Palette } from 'lucide-vue-next'
+-import { markerIconOptions, markerIconSvg } from '~/lib/marker-icons'
+ definePageMeta({layout:'admin',middleware:'admin'})
+ const me=useState<any>('auth-user'); if(me.value?.role==='editor') await navigateTo('/admin')
+ const {data,refresh}=await useFetch('/api/admin/categories')
+@@ -8,7 +7,32 @@ const newName=ref(''); const newColor=ref('#0F766E'); const newIcon=ref('map-pin
+ async function save(c:any){error.value='';message.value='';try{await $fetch(`/api/admin/categories/${c.id}`,{method:'PUT',body:{name:c.name,color:c.color,icon_key:c.icon_key}});message.value='Kategori diperbarui.';await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menyimpan'}}
+ async function add(){error.value='';try{await $fetch('/api/admin/categories',{method:'POST',body:{name:newName.value,color:newColor.value,icon_key:newIcon.value}});newName.value='';newColor.value='#0F766E';newIcon.value='map-pin';await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menambah kategori'}}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Categories" description="Warna dan icon kategori otomatis menentukan tampilan marker di peta."/>
+-<div v-if="message" class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{message}}</div><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div>
+-<div class="grid gap-4 lg:grid-cols-[1fr_360px]"><UiCard class="overflow-hidden"><div class="border-b px-5 py-4"><h2 class="font-semibold">Kategori tersedia</h2></div><div class="divide-y"><div v-for="c in data?.categories||[]" :key="c.id" class="grid gap-4 p-5 md:grid-cols-[1fr_190px_210px_auto] md:items-end"><div class="space-y-2"><UiLabel>Nama kategori</UiLabel><UiInput v-model="c.name"/></div><div class="space-y-2"><UiLabel>Warna marker</UiLabel><div class="flex items-center gap-2"><input v-model="c.color" type="color" class="h-10 w-12 cursor-pointer rounded-lg border bg-white p-1"><UiInput v-model="c.color" class="w-28 font-mono"/></div></div><div class="space-y-2"><UiLabel>Icon marker</UiLabel><div class="flex items-center gap-2"><span class="inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white" :style="{color:c.color}" v-html="markerIconSvg(c.icon_key,{size:18,color:c.color,strokeWidth:2.2})"></span><UiSelect v-model="c.icon_key" class="min-w-0 flex-1"><option v-for="icon in markerIconOptions" :key="icon.key" :value="icon.key">{{icon.label}}</option></UiSelect></div></div><UiButton @click="save(c)"><Save class="h-4 w-4"/>Save</UiButton></div></div></UiCard>
+-<UiCard class="h-fit p-5"><div class="mb-4 flex items-center gap-2"><Palette class="h-5 w-5 text-teal-700"/><h2 class="font-semibold">Tambah kategori</h2></div><div class="space-y-4"><div class="space-y-2"><UiLabel>Nama</UiLabel><UiInput v-model="newName" placeholder="Contoh: CCTV"/></div><div class="space-y-2"><UiLabel>Warna</UiLabel><div class="flex gap-2"><input v-model="newColor" type="color" class="h-10 w-12 rounded-lg border p-1"><UiInput v-model="newColor"/></div></div><div class="space-y-2"><UiLabel>Icon</UiLabel><div class="flex items-center gap-2"><span class="inline-flex h-10 w-10 items-center justify-center rounded-full border bg-white" v-html="markerIconSvg(newIcon,{size:18,color:newColor,strokeWidth:2.2})"></span><UiSelect v-model="newIcon" class="flex-1"><option v-for="icon in markerIconOptions" :key="icon.key" :value="icon.key">{{icon.label}}</option></UiSelect></div></div><UiButton class="w-full" @click="add"><Plus class="h-4 w-4"/>Tambah</UiButton></div></UiCard></div></div></template>
++<template>
++  <div class="space-y-6">
++    <UiPageHeader title="Kategori" description="Warna dan ikon kategori otomatis menentukan tampilan marker di peta."/>
++    <div v-if="message" class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{message}}</div>
++    <div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div>
++    <div class="grid gap-4 lg:grid-cols-[1fr_360px]">
++      <UiCard class="overflow-hidden">
++        <div class="border-b px-5 py-4"><h2 class="font-semibold">Kategori tersedia</h2></div>
++        <div class="divide-y">
++          <div v-for="c in data?.categories||[]" :key="c.id" class="grid gap-4 p-5 xl:grid-cols-[1fr_190px_minmax(240px,1.2fr)_auto] xl:items-end">
++            <div class="space-y-2"><UiLabel>Nama kategori</UiLabel><UiInput v-model="c.name"/></div>
++            <div class="space-y-2"><UiLabel>Warna marker</UiLabel><div class="flex items-center gap-2"><input v-model="c.color" type="color" class="h-10 w-12 cursor-pointer rounded-lg border bg-white p-1"><UiInput v-model="c.color" class="w-28 font-mono"/></div></div>
++            <div class="space-y-2"><UiLabel>Ikon marker</UiLabel><MarkerIconPicker v-model="c.icon_key" :color="c.color"/></div>
++            <UiButton @click="save(c)"><Save class="h-4 w-4"/>Simpan</UiButton>
++          </div>
++        </div>
++      </UiCard>
++      <UiCard class="h-fit p-5">
++        <div class="mb-4 flex items-center gap-2"><Palette class="h-5 w-5 text-teal-700"/><h2 class="font-semibold">Tambah kategori</h2></div>
++        <div class="space-y-4">
++          <div class="space-y-2"><UiLabel>Nama</UiLabel><UiInput v-model="newName" placeholder="Contoh: CCTV"/></div>
++          <div class="space-y-2"><UiLabel>Warna</UiLabel><div class="flex gap-2"><input v-model="newColor" type="color" class="h-10 w-12 rounded-lg border p-1"><UiInput v-model="newColor"/></div></div>
++          <div class="space-y-2"><UiLabel>Ikon</UiLabel><MarkerIconPicker v-model="newIcon" :color="newColor"/></div>
++          <UiButton class="w-full" @click="add"><Plus class="h-4 w-4"/>Tambah</UiButton>
++        </div>
++      </UiCard>
++    </div>
++  </div>
++</template>
+diff --git a/app/pages/admin/imports/history.vue b/app/pages/admin/imports/history.vue
+index 68e68e9..2ec94bf 100644
+--- a/app/pages/admin/imports/history.vue
++++ b/app/pages/admin/imports/history.vue
+@@ -3,8 +3,8 @@ import { RotateCcw, FileSpreadsheet, AlertTriangle } from 'lucide-vue-next'
+ definePageMeta({layout:'admin',middleware:'admin'})
+ const me=useState<any>('auth-user'); const {data,refresh}=await useFetch('/api/admin/imports')
+ const notice=ref(''); const error=ref('')
+-async function rollback(batch:any){const msg=`Rollback import ${batch.file_name}?\n\n${batch.rollbackable_count} location akan dihapus. ${batch.modified_count} location yang sudah diedit manual akan dipertahankan.`;if(!confirm(msg))return;try{const r:any=await $fetch(`/api/admin/imports/${batch.id}/rollback`,{method:'POST'});notice.value=`Rollback selesai: ${r.rolledBack} dihapus, ${r.retainedModified} data yang sudah diedit dipertahankan.`;await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Rollback gagal'}}
++async function rollback(batch:any){const msg=`Rollback impor ${batch.file_name}?\n\n${batch.rollbackable_count} lokasi akan dihapus. ${batch.modified_count} lokasi yang sudah diedit manual akan dipertahankan.`;if(!confirm(msg))return;try{const r:any=await $fetch(`/api/admin/imports/${batch.id}/rollback`,{method:'POST'});notice.value=`Rollback selesai: ${r.rolledBack} dihapus, ${r.retainedModified} data yang sudah diedit dipertahankan.`;await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Rollback gagal'}}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Import History" description="Lacak sumber data Excel dan rollback batch yang salah."/>
++<template><div class="space-y-6"><UiPageHeader title="Riwayat Impor" description="Lacak sumber data Excel dan rollback batch yang salah."/>
+ <div v-if="notice" class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{notice}}</div><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div>
+-<UiCard class="overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">File</th><th class="px-4 py-3">Imported by</th><th class="px-4 py-3">Result</th><th class="px-4 py-3">Date</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y"><tr v-for="b in data?.batches||[]" :key="b.id"><td class="px-4 py-4"><div class="flex items-center gap-2 font-medium"><FileSpreadsheet class="h-4 w-4 text-emerald-600"/>{{b.file_name}}</div></td><td class="px-4 py-4"><div>{{b.imported_by_name}}</div><div class="text-xs text-slate-400">{{b.imported_by_email}}</div></td><td class="px-4 py-4 text-xs"><div>{{b.imported_rows}} imported · {{b.skipped_rows}} skipped</div><div v-if="Number(b.modified_count)>0" class="mt-1 flex items-center gap-1 text-amber-700"><AlertTriangle class="h-3.5 w-3.5"/>{{b.modified_count}} edited after import</div></td><td class="px-4 py-4">{{new Date(b.created_at).toLocaleString('id-ID')}}</td><td class="px-4 py-4"><UiBadge :variant="b.rolled_back_at?'warning':'success'">{{b.rolled_back_at?'Rolled back':'Active'}}</UiBadge></td><td class="px-4 py-4 text-right"><UiButton v-if="!b.rolled_back_at && (me?.role==='admin' || me?.role==='manager')" variant="outline" size="sm" @click="rollback(b)"><RotateCcw class="h-4 w-4"/>Rollback</UiButton></td></tr></tbody></table></div><EmptyState v-if="!(data?.batches?.length)" title="Belum ada import history"/></UiCard></div></template>
++<UiCard class="overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">File</th><th class="px-4 py-3">Diimpor oleh</th><th class="px-4 py-3">Hasil</th><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y"><tr v-for="b in data?.batches||[]" :key="b.id"><td class="px-4 py-4"><div class="flex items-center gap-2 font-medium"><FileSpreadsheet class="h-4 w-4 text-emerald-600"/>{{b.file_name}}</div></td><td class="px-4 py-4"><div>{{b.imported_by_name}}</div><div class="text-xs text-slate-400">{{b.imported_by_email}}</div></td><td class="px-4 py-4 text-xs"><div>{{b.imported_rows}} diimpor · {{b.skipped_rows}} dilewati</div><div v-if="Number(b.modified_count)>0" class="mt-1 flex items-center gap-1 text-amber-700"><AlertTriangle class="h-3.5 w-3.5"/>{{b.modified_count}} diedit setelah impor</div></td><td class="px-4 py-4">{{new Date(b.created_at).toLocaleString('id-ID')}}</td><td class="px-4 py-4"><UiBadge :variant="b.rolled_back_at?'warning':'success'">{{b.rolled_back_at?'Sudah di-rollback':'Aktif'}}</UiBadge></td><td class="px-4 py-4 text-right"><UiButton v-if="!b.rolled_back_at && (me?.role==='admin' || me?.role==='manager')" variant="outline" size="sm" @click="rollback(b)"><RotateCcw class="h-4 w-4"/>Rollback</UiButton></td></tr></tbody></table></div><EmptyState v-if="!(data?.batches?.length)" title="Belum ada riwayat impor"/></UiCard></div></template>
+diff --git a/app/pages/admin/imports/index.vue b/app/pages/admin/imports/index.vue
+index 138bb7b..122ec47 100644
+--- a/app/pages/admin/imports/index.vue
++++ b/app/pages/admin/imports/index.vue
+@@ -1,14 +1,14 @@
+ <script setup lang="ts">
+-import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Download, RotateCcw } from 'lucide-vue-next'
++import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Download } from 'lucide-vue-next'
+ definePageMeta({layout:'admin',middleware:'admin'})
+ const file=ref<File|null>(null); const skipDuplicates=ref(true); const loading=ref(false); const committing=ref(false); const error=ref(''); const preview=ref<any>(null); const result=ref<any>(null)
+ function onFile(e:Event){file.value=(e.target as HTMLInputElement).files?.[0]||null;preview.value=null;result.value=null}
+-async function doPreview(){if(!file.value)return;loading.value=true;error.value='';try{const fd=new FormData();fd.append('file',file.value);fd.append('skip_duplicates',String(skipDuplicates.value));preview.value=await $fetch('/api/admin/imports/preview',{method:'POST',body:fd})}catch(e:any){error.value=e?.data?.statusMessage||'Preview gagal'}finally{loading.value=false}}
+-async function commit(){if(!preview.value)return;committing.value=true;error.value='';try{result.value=await $fetch('/api/admin/imports/commit',{method:'POST',body:{token:preview.value.token,skipDuplicates:skipDuplicates.value}});preview.value=null;file.value=null}catch(e:any){error.value=e?.data?.statusMessage||'Import gagal'}finally{committing.value=false}}
++async function doPreview(){if(!file.value)return;loading.value=true;error.value='';try{const fd=new FormData();fd.append('file',file.value);fd.append('skip_duplicates',String(skipDuplicates.value));preview.value=await $fetch('/api/admin/imports/preview',{method:'POST',body:fd})}catch(e:any){error.value=e?.data?.statusMessage||'Pratinjau gagal'}finally{loading.value=false}}
++async function commit(){if(!preview.value)return;committing.value=true;error.value='';try{result.value=await $fetch('/api/admin/imports/commit',{method:'POST',body:{token:preview.value.token,skipDuplicates:skipDuplicates.value}});preview.value=null;file.value=null}catch(e:any){error.value=e?.data?.statusMessage||'Impor gagal'}finally{committing.value=false}}
+ function rowClass(row:any){return row.status==='skip'?'bg-red-50/80':row.status==='warning'?'bg-amber-50/70':'bg-white'}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Bulk Import" description="Upload template Excel standar, review validasi, lalu import hanya baris yang siap."><a href="/templates/Template_Import_Transportation_GIS_v0.3.xlsx" download><UiButton variant="outline"><Download class="h-4 w-4"/>Download Template</UiButton></a></UiPageHeader>
+-<div v-if="error" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{error}}</div><div v-if="result" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"><div class="font-semibold">Import selesai</div><div class="mt-1 text-sm">{{result.imported}} lokasi berhasil diimport, {{result.skipped}} baris dilewati.</div></div>
+-<UiCard class="p-5"><div class="grid gap-4 md:grid-cols-[1fr_auto]"><div><label class="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-slate-50 p-5 transition hover:bg-slate-100"><div class="rounded-xl bg-emerald-100 p-3 text-emerald-700"><FileSpreadsheet class="h-6 w-6"/></div><div class="min-w-0"><div class="font-medium">{{file?.name||'Pilih file .xlsx'}}</div><p class="mt-1 text-sm text-slate-500">Gunakan template standar Transportation GIS v0.3.</p></div><input type="file" accept=".xlsx" class="hidden" @change="onFile"></label><label class="mt-3 flex items-center gap-2 text-sm text-slate-600"><input v-model="skipDuplicates" type="checkbox" class="rounded border-slate-300 text-teal-700 focus:ring-teal-500">Skip potential duplicate berdasarkan kategori + koordinat</label></div><div class="flex items-end"><UiButton :disabled="!file||loading" @click="doPreview"><Upload class="h-4 w-4"/>{{loading?'Memeriksa...':'Preview File'}}</UiButton></div></div></UiCard>
+-<template v-if="preview"><div class="grid gap-3 sm:grid-cols-4"><UiCard class="p-4"><div class="text-xs text-slate-500">Total rows</div><div class="mt-1 text-2xl font-bold">{{preview.summary.total}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Ready</div><div class="mt-1 text-2xl font-bold text-emerald-700">{{preview.summary.ready}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Warnings</div><div class="mt-1 text-2xl font-bold text-amber-700">{{preview.summary.warning}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Will not import</div><div class="mt-1 text-2xl font-bold text-red-700">{{preview.summary.skipped}}</div></UiCard></div>
+-<UiCard class="overflow-hidden"><div class="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="font-semibold">Import Preview</h2><p class="mt-1 text-xs text-slate-500">Baris merah tidak akan di-upload. Hover/lihat alasan pada kolom Status.</p></div><UiButton :disabled="committing||preview.summary.ready===0" @click="commit"><CheckCircle2 class="h-4 w-4"/>{{committing?'Importing...':`Import ${preview.summary.ready} Rows`}}</UiButton></div><div class="max-h-[620px] overflow-auto"><table class="w-full min-w-[1100px] text-left text-sm"><thead class="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-500"><tr><th class="px-3 py-3">Row</th><th class="px-3 py-3">Validasi</th><th class="px-3 py-3">Tahun</th><th class="px-3 py-3">Kecamatan</th><th class="px-3 py-3">Lokasi</th><th class="px-3 py-3">Koordinat</th><th class="px-3 py-3">Kategori</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Kondisi</th><th class="px-3 py-3">Foto</th></tr></thead><tbody class="divide-y"><tr v-for="row in preview.rows" :key="row.rowNumber" :class="rowClass(row)"><td class="px-3 py-3 font-mono text-xs">{{row.rowNumber}}</td><td class="px-3 py-3"><div v-if="row.status==='valid'" class="flex items-center gap-1.5 text-emerald-700"><CheckCircle2 class="h-4 w-4"/>Valid</div><div v-else-if="row.status==='warning'" class="text-amber-800"><div class="flex items-center gap-1.5 font-medium"><AlertTriangle class="h-4 w-4"/>Warning</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div><div v-else class="text-red-700"><div class="flex items-center gap-1.5 font-semibold"><XCircle class="h-4 w-4"/>Skipped</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div></td><td class="px-3 py-3">{{row.fiscalYear ?? '—'}}</td><td class="px-3 py-3">{{row.districtName}}</td><td class="max-w-sm px-3 py-3">{{row.locationName}}</td><td class="px-3 py-3 font-mono text-xs">{{row.latitude}}, {{row.longitude}}</td><td class="px-3 py-3">{{row.categoryName}}</td><td class="px-3 py-3"><UiBadge :variant="row.implementationStatus==='PLANNED'?'warning':'success'">{{row.implementationStatus==='PLANNED'?'Direncanakan':'Eksisting'}}</UiBadge></td><td class="px-3 py-3">{{row.condition}}</td><td class="px-3 py-3"><UiBadge :variant="row.hasPhoto?'success':'warning'">{{row.hasPhoto?'Ada':'Tidak ada'}}</UiBadge></td></tr></tbody></table></div></UiCard></template></div></template>
++<template><div class="space-y-6"><UiPageHeader title="Impor Massal" description="Unggah template Excel standar, tinjau hasil validasi, lalu impor baris yang siap."><a href="/templates/Template_Import_Transportation_GIS_v0.3.xlsx" download><UiButton variant="outline"><Download class="h-4 w-4"/>Unduh Template</UiButton></a></UiPageHeader>
++<div v-if="error" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{error}}</div><div v-if="result" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"><div class="font-semibold">Impor selesai</div><div class="mt-1 text-sm">{{result.imported}} lokasi berhasil diimpor, {{result.skipped}} baris dilewati.</div></div>
++<UiCard class="p-5"><div class="grid gap-4 md:grid-cols-[1fr_auto]"><div><label class="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-slate-50 p-5 transition hover:bg-slate-100"><div class="rounded-xl bg-emerald-100 p-3 text-emerald-700"><FileSpreadsheet class="h-6 w-6"/></div><div class="min-w-0"><div class="font-medium">{{file?.name||'Pilih file .xlsx'}}</div><p class="mt-1 text-sm text-slate-500">Gunakan template standar Peta Perlengkapan Jalan v0.3.</p></div><input type="file" accept=".xlsx" class="hidden" @change="onFile"></label><label class="mt-3 flex items-center gap-2 text-sm text-slate-600"><input v-model="skipDuplicates" type="checkbox" class="rounded border-slate-300 text-teal-700 focus:ring-teal-500">Lewati potensi duplikat berdasarkan kategori + koordinat</label></div><div class="flex items-end"><UiButton :disabled="!file||loading" @click="doPreview"><Upload class="h-4 w-4"/>{{loading?'Memeriksa...':'Pratinjau File'}}</UiButton></div></div></UiCard>
++<template v-if="preview"><div class="grid gap-3 sm:grid-cols-4"><UiCard class="p-4"><div class="text-xs text-slate-500">Total Baris</div><div class="mt-1 text-2xl font-bold">{{preview.summary.total}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Siap</div><div class="mt-1 text-2xl font-bold text-emerald-700">{{preview.summary.ready}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Peringatan</div><div class="mt-1 text-2xl font-bold text-amber-700">{{preview.summary.warning}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Tidak Diimpor</div><div class="mt-1 text-2xl font-bold text-red-700">{{preview.summary.skipped}}</div></UiCard></div>
++<UiCard class="overflow-hidden"><div class="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="font-semibold">Pratinjau Impor</h2><p class="mt-1 text-xs text-slate-500">Baris merah tidak akan diimpor. Lihat alasan pada kolom Validasi.</p></div><UiButton :disabled="committing||preview.summary.ready===0" @click="commit"><CheckCircle2 class="h-4 w-4"/>{{committing?'Mengimpor...':`Impor ${preview.summary.ready} Baris`}}</UiButton></div><div class="max-h-[620px] overflow-auto"><table class="w-full min-w-[1100px] text-left text-sm"><thead class="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-500"><tr><th class="px-3 py-3">Baris</th><th class="px-3 py-3">Validasi</th><th class="px-3 py-3">Tahun</th><th class="px-3 py-3">Kecamatan</th><th class="px-3 py-3">Lokasi</th><th class="px-3 py-3">Koordinat</th><th class="px-3 py-3">Kategori</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Kondisi</th><th class="px-3 py-3">Foto</th></tr></thead><tbody class="divide-y"><tr v-for="row in preview.rows" :key="row.rowNumber" :class="rowClass(row)"><td class="px-3 py-3 font-mono text-xs">{{row.rowNumber}}</td><td class="px-3 py-3"><div v-if="row.status==='valid'" class="flex items-center gap-1.5 text-emerald-700"><CheckCircle2 class="h-4 w-4"/>Valid</div><div v-else-if="row.status==='warning'" class="text-amber-800"><div class="flex items-center gap-1.5 font-medium"><AlertTriangle class="h-4 w-4"/>Peringatan</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div><div v-else class="text-red-700"><div class="flex items-center gap-1.5 font-semibold"><XCircle class="h-4 w-4"/>Dilewati</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div></td><td class="px-3 py-3">{{row.fiscalYear ?? '—'}}</td><td class="px-3 py-3">{{row.districtName}}</td><td class="max-w-sm px-3 py-3">{{row.locationName}}</td><td class="px-3 py-3 font-mono text-xs">{{row.latitude}}, {{row.longitude}}</td><td class="px-3 py-3">{{row.categoryName}}</td><td class="px-3 py-3"><UiBadge :variant="row.implementationStatus==='PLANNED'?'warning':'success'">{{row.implementationStatus==='PLANNED'?'Direncanakan':'Terpasang'}}</UiBadge></td><td class="px-3 py-3">{{row.condition}}</td><td class="px-3 py-3"><UiBadge :variant="row.hasPhoto?'success':'warning'">{{row.hasPhoto?'Ada':'Tidak ada'}}</UiBadge></td></tr></tbody></table></div></UiCard></template></div></template>
+diff --git a/app/pages/admin/index.vue b/app/pages/admin/index.vue
+index baee464..97e28ae 100644
+--- a/app/pages/admin/index.vue
++++ b/app/pages/admin/index.vue
+@@ -3,18 +3,18 @@ import { MapPin, Building2, Upload, Tags } from 'lucide-vue-next'
+ definePageMeta({layout:'admin',middleware:'admin'})
+ const {data}=await useFetch('/api/admin/dashboard')
+ const cards=computed(()=>[
+-  {label:'Total Locations',value:data.value?.locations||0,icon:MapPin},
++  {label:'Total Lokasi',value:data.value?.locations||0,icon:MapPin},
+   {label:'Kecamatan Terisi',value:data.value?.districts||0,icon:Building2},
+-  {label:'Import Batch',value:data.value?.imports||0,icon:Upload},
++  {label:'Batch Impor',value:data.value?.imports||0,icon:Upload},
+   {label:'Kategori',value:data.value?.categories||0,icon:Tags}
+ ])
+ </script>
+ <template>
+   <div class="space-y-6">
+-    <UiPageHeader title="Dashboard" description="Ringkasan data Transportation GIS."/>
++    <UiPageHeader title="Dashboard" description="Ringkasan data Peta Perlengkapan Jalan."/>
+     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+       <UiCard v-for="c in cards" :key="c.label" class="p-5"><div class="flex items-start justify-between"><div><div class="text-sm text-slate-500">{{c.label}}</div><div class="mt-2 text-3xl font-bold tracking-tight">{{c.value}}</div></div><div class="rounded-xl bg-teal-50 p-2.5 text-teal-700"><component :is="c.icon" class="h-5 w-5"/></div></div></UiCard>
+     </div>
+-    <UiCard class="overflow-hidden"><div class="border-b px-5 py-4"><h2 class="font-semibold">Quick actions</h2></div><div class="grid gap-3 p-5 md:grid-cols-3"><NuxtLink to="/admin/locations/new" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Tambah Location</div><p class="mt-1 text-sm text-slate-500">Input satu titik secara manual.</p></NuxtLink><NuxtLink to="/admin/imports" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Bulk Import</div><p class="mt-1 text-sm text-slate-500">Preview dan import template Excel standar.</p></NuxtLink><NuxtLink to="/admin/categories" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Edit Marker Color</div><p class="mt-1 text-sm text-slate-500">Atur warna setiap kategori.</p></NuxtLink></div></UiCard>
++    <UiCard class="overflow-hidden"><div class="border-b px-5 py-4"><h2 class="font-semibold">Aksi cepat</h2></div><div class="grid gap-3 p-5 md:grid-cols-3"><NuxtLink to="/admin/locations/new" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Tambah Lokasi</div><p class="mt-1 text-sm text-slate-500">Input satu titik secara manual.</p></NuxtLink><NuxtLink to="/admin/imports" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Impor Massal</div><p class="mt-1 text-sm text-slate-500">Pratinjau dan impor template Excel standar.</p></NuxtLink><NuxtLink to="/admin/categories" class="rounded-xl border p-4 transition hover:border-teal-300 hover:bg-teal-50"><div class="font-medium">Atur Marker</div><p class="mt-1 text-sm text-slate-500">Atur warna dan ikon setiap kategori.</p></NuxtLink></div></UiCard>
+   </div>
+ </template>
+diff --git a/app/pages/admin/locations/[id].vue b/app/pages/admin/locations/[id].vue
+index c01fcee..e11c373 100644
+--- a/app/pages/admin/locations/[id].vue
++++ b/app/pages/admin/locations/[id].vue
+@@ -4,4 +4,4 @@ definePageMeta({layout:'admin',middleware:'admin'})
+ const route=useRoute(); const error=ref(''); const {data}=await useFetch(`/api/admin/locations/${route.params.id}`)
+ async function submit(fd:FormData){error.value='';try{await $fetch(`/api/admin/locations/${route.params.id}`,{method:'PUT',body:fd});await navigateTo('/admin/locations')}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menyimpan'}}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Edit Location" description="Perubahan pada data hasil import akan ditandai agar tidak terhapus saat rollback batch."><NuxtLink to="/admin/locations"><UiButton variant="outline"><ArrowLeft class="h-4 w-4"/>Kembali</UiButton></NuxtLink></UiPageHeader><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><LocationForm v-if="data?.location" :model="data.location" submit-label="Simpan Perubahan" @submit="submit"/></div></template>
++<template><div class="space-y-6"><UiPageHeader title="Edit Lokasi" description="Perubahan pada data hasil impor akan ditandai agar tidak terhapus saat rollback batch."><NuxtLink to="/admin/locations"><UiButton variant="outline"><ArrowLeft class="h-4 w-4"/>Kembali</UiButton></NuxtLink></UiPageHeader><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><LocationForm v-if="data?.location" :model="data.location" submit-label="Simpan Perubahan" @submit="submit"/></div></template>
+diff --git a/app/pages/admin/locations/index.vue b/app/pages/admin/locations/index.vue
+index c8e5846..cc016c2 100644
+--- a/app/pages/admin/locations/index.vue
++++ b/app/pages/admin/locations/index.vue
+@@ -6,6 +6,6 @@ const {data:cats}=await useFetch('/api/admin/categories'); const {data:dists}=aw
+ const {data,refresh}=await useFetch('/api/admin/locations',{query:{search,category,district,status,year}})
+ async function remove(item:any){if(!confirm(`Hapus lokasi ini?\n\n${item.location_name}\n${item.category} · ${item.district}`))return;await $fetch(`/api/admin/locations/${item.id}`,{method:'DELETE'});await refresh()}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Locations" description="Kelola seluruh titik GIS dan sumber datanya."><NuxtLink to="/admin/locations/new"><UiButton><Plus class="h-4 w-4"/>Tambah Location</UiButton></NuxtLink></UiPageHeader>
+-<UiCard class="p-4"><div class="grid gap-3 md:grid-cols-5"><div class="relative"><Search class="absolute left-3 top-3 h-4 w-4 text-slate-400"/><UiInput v-model="search" class="pl-9" placeholder="Cari lokasi..."/></div><UiSelect v-model="category"><option value="">Semua kategori</option><option v-for="c in cats?.categories||[]" :key="c.id" :value="c.id">{{c.name}}</option></UiSelect><UiSelect v-model="district"><option value="">Semua kecamatan</option><option v-for="d in dists?.districts||[]" :key="d.id" :value="d.id">{{d.name}}</option></UiSelect><UiSelect v-model="status"><option value="">Semua status</option><option value="EXISTING">Eksisting</option><option value="PLANNED">Direncanakan</option></UiSelect><UiInput v-model="year" type="number" placeholder="Tahun anggaran"/></div></UiCard>
+-<UiCard class="overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Lokasi</th><th class="px-4 py-3">Kategori</th><th class="px-4 py-3">Kecamatan</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">TA</th><th class="px-4 py-3">Kondisi</th><th class="px-4 py-3">Sumber</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y"><tr v-for="item in data?.locations||[]" :key="item.id" class="hover:bg-slate-50/70"><td class="max-w-sm px-4 py-4 font-medium text-slate-900">{{item.location_name}}</td><td class="px-4 py-4"><span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" :style="{background:item.category_color}"></span>{{item.category}}</span></td><td class="px-4 py-4">{{item.district}}</td><td class="px-4 py-4"><UiBadge :variant="item.implementation_status==='PLANNED'?'warning':'success'">{{item.implementation_status==='PLANNED'?'Direncanakan':'Eksisting'}}</UiBadge></td><td class="px-4 py-4">{{item.fiscal_year ?? '—'}}</td><td class="px-4 py-4"><UiBadge :variant="item.condition==='Tidak Baik / Tidak Sesuai'?'destructive':item.condition==='Belum Dinilai'?'warning':'success'">{{item.condition}}</UiBadge></td><td class="px-4 py-4"><div class="flex items-center gap-2"><FileSpreadsheet v-if="item.source_type==='excel'" class="h-4 w-4 text-emerald-600"/><span class="max-w-[180px] truncate" :title="item.source_file_name">{{item.source_type==='excel'?item.source_file_name:'Manual'}}</span></div></td><td class="px-4 py-4"><div class="flex justify-end gap-1"><NuxtLink :to="`/admin/locations/${item.id}`"><UiButton variant="ghost" size="sm"><Pencil class="h-4 w-4"/></UiButton></NuxtLink><UiButton v-if="me?.role==='admin' || me?.role==='manager'" variant="ghost" size="sm" @click="remove(item)"><Trash2 class="h-4 w-4 text-red-600"/></UiButton></div></td></tr></tbody></table></div><EmptyState v-if="!(data?.locations?.length)" title="Belum ada location" description="Tambahkan secara manual atau import template Excel."/></UiCard></div></template>
++<template><div class="space-y-6"><UiPageHeader title="Lokasi" description="Kelola seluruh titik GIS dan sumber datanya."><NuxtLink to="/admin/locations/new"><UiButton><Plus class="h-4 w-4"/>Tambah Lokasi</UiButton></NuxtLink></UiPageHeader>
++<UiCard class="p-4"><div class="grid gap-3 md:grid-cols-5"><div class="relative"><Search class="absolute left-3 top-3 h-4 w-4 text-slate-400"/><UiInput v-model="search" class="pl-9" placeholder="Cari lokasi..."/></div><UiSelect v-model="category"><option value="">Semua kategori</option><option v-for="c in cats?.categories||[]" :key="c.id" :value="c.id">{{c.name}}</option></UiSelect><UiSelect v-model="district"><option value="">Semua kecamatan</option><option v-for="d in dists?.districts||[]" :key="d.id" :value="d.id">{{d.name}}</option></UiSelect><UiSelect v-model="status"><option value="">Semua status</option><option value="EXISTING">Terpasang</option><option value="PLANNED">Direncanakan</option></UiSelect><UiInput v-model="year" type="number" placeholder="Tahun anggaran"/></div></UiCard>
++<UiCard class="overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Lokasi</th><th class="px-4 py-3">Kategori</th><th class="px-4 py-3">Kecamatan</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">TA</th><th class="px-4 py-3">Kondisi</th><th class="px-4 py-3">Sumber</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y"><tr v-for="item in data?.locations||[]" :key="item.id" class="hover:bg-slate-50/70"><td class="max-w-sm px-4 py-4 font-medium text-slate-900">{{item.location_name}}</td><td class="px-4 py-4"><span class="inline-flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" :style="{background:item.category_color}"></span>{{item.category}}</span></td><td class="px-4 py-4">{{item.district}}</td><td class="px-4 py-4"><UiBadge :variant="item.implementation_status==='PLANNED'?'warning':'success'">{{item.implementation_status==='PLANNED'?'Direncanakan':'Terpasang'}}</UiBadge></td><td class="px-4 py-4">{{item.fiscal_year ?? '—'}}</td><td class="px-4 py-4"><UiBadge :variant="item.condition==='Tidak Baik / Tidak Sesuai'?'destructive':item.condition==='Belum Dinilai'?'warning':'success'">{{item.condition}}</UiBadge></td><td class="px-4 py-4"><div class="flex items-center gap-2"><FileSpreadsheet v-if="item.source_type==='excel'" class="h-4 w-4 text-emerald-600"/><span class="max-w-[180px] truncate" :title="item.source_file_name">{{item.source_type==='excel'?item.source_file_name:'Manual'}}</span></div></td><td class="px-4 py-4"><div class="flex justify-end gap-1"><NuxtLink :to="`/admin/locations/${item.id}`"><UiButton variant="ghost" size="sm"><Pencil class="h-4 w-4"/></UiButton></NuxtLink><UiButton v-if="me?.role==='admin' || me?.role==='manager'" variant="ghost" size="sm" @click="remove(item)"><Trash2 class="h-4 w-4 text-red-600"/></UiButton></div></td></tr></tbody></table></div><EmptyState v-if="!(data?.locations?.length)" title="Belum ada lokasi" description="Tambahkan secara manual atau impor template Excel."/></UiCard></div></template>
+diff --git a/app/pages/admin/locations/new.vue b/app/pages/admin/locations/new.vue
+index 9e667bc..689b384 100644
+--- a/app/pages/admin/locations/new.vue
++++ b/app/pages/admin/locations/new.vue
+@@ -4,4 +4,4 @@ definePageMeta({layout:'admin',middleware:'admin'})
+ const error=ref('')
+ async function submit(fd:FormData){error.value='';try{await $fetch('/api/admin/locations',{method:'POST',body:fd});await navigateTo('/admin/locations')}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menyimpan'}}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Tambah Location" description="Input satu titik GIS secara manual."><NuxtLink to="/admin/locations"><UiButton variant="outline"><ArrowLeft class="h-4 w-4"/>Kembali</UiButton></NuxtLink></UiPageHeader><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><LocationForm @submit="submit"/></div></template>
++<template><div class="space-y-6"><UiPageHeader title="Tambah Lokasi" description="Input satu titik GIS secara manual."><NuxtLink to="/admin/locations"><UiButton variant="outline"><ArrowLeft class="h-4 w-4"/>Kembali</UiButton></NuxtLink></UiPageHeader><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><LocationForm @submit="submit"/></div></template>
+diff --git a/app/pages/admin/login.vue b/app/pages/admin/login.vue
+index 922e067..66ffb1e 100644
+--- a/app/pages/admin/login.vue
++++ b/app/pages/admin/login.vue
+@@ -8,14 +8,14 @@ async function submit(){ loading.value=true; error.value=''; try { await $fetch(
+     <UiCard class="w-full max-w-md overflow-hidden">
+       <div class="border-b bg-gradient-to-r from-teal-800 to-teal-600 p-6 text-white">
+         <div class="mb-4 inline-flex rounded-xl bg-white/15 p-2.5"><Map class="h-6 w-6"/></div>
+-        <h1 class="text-2xl font-bold">Transportation GIS</h1><p class="mt-1 text-sm text-teal-50">Masuk untuk mengelola data GIS.</p>
++        <h1 class="text-2xl font-bold">Peta Perlengkapan Jalan</h1><p class="mt-1 text-sm text-teal-50">Masuk untuk mengelola data GIS.</p>
+       </div>
+       <form class="space-y-5 p-6" @submit.prevent="submit">
+         <div v-if="error" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ error }}</div>
+         <div class="space-y-2"><UiLabel>Email</UiLabel><UiInput v-model="email" type="email" placeholder="admin@example.com"/></div>
+-        <div class="space-y-2"><UiLabel>Password</UiLabel><UiInput v-model="password" type="password"/></div>
+-        <UiButton type="submit" class="w-full" :disabled="loading"><LogIn class="h-4 w-4"/>{{ loading?'Signing in...':'Sign in' }}</UiButton>
+-        <NuxtLink to="/" class="block text-center text-sm text-teal-700 hover:underline">Kembali ke public map</NuxtLink>
++        <div class="space-y-2"><UiLabel>Kata Sandi</UiLabel><UiInput v-model="password" type="password"/></div>
++        <UiButton type="submit" class="w-full" :disabled="loading"><LogIn class="h-4 w-4"/>{{ loading?'Sedang masuk...':'Masuk' }}</UiButton>
++        <NuxtLink to="/" class="block text-center text-sm text-teal-700 hover:underline">Kembali ke Peta Publik</NuxtLink>
+       </form>
+     </UiCard>
+   </div>
+diff --git a/app/pages/admin/users/index.vue b/app/pages/admin/users/index.vue
+index c92e3bf..cbbe8d8 100644
+--- a/app/pages/admin/users/index.vue
++++ b/app/pages/admin/users/index.vue
+@@ -6,4 +6,4 @@ const {data,refresh}=await useFetch('/api/admin/users'); const addForm=reactive(
+ async function add(){try{await $fetch('/api/admin/users',{method:'POST',body:addForm});Object.assign(addForm,{name:'',email:'',password:'',role:'editor'});await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menambah user'}}
+ async function save(u:any){try{await $fetch(`/api/admin/users/${u.id}`,{method:'PUT',body:{name:u.name,email:u.email,role:u.role,is_active:u.is_active,password:u.newPassword||undefined}});u.newPassword='';await refresh()}catch(e:any){error.value=e?.data?.statusMessage||'Gagal menyimpan user'}}
+ </script>
+-<template><div class="space-y-6"><UiPageHeader title="Users" description="Kelola akun dan role Admin, GIS Manager, serta GIS Editor."/><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><div class="grid gap-4 xl:grid-cols-[1fr_360px]"><UiCard class="overflow-hidden"><div class="divide-y"><div v-for="u in data?.users||[]" :key="u.id" class="grid gap-3 p-5 md:grid-cols-[1fr_1fr_160px_130px_auto]"><UiInput v-model="u.name"/><UiInput v-model="u.email"/><UiSelect v-model="u.role"><option value="admin">Admin</option><option value="manager">GIS Manager</option><option value="editor">GIS Editor</option></UiSelect><label class="flex items-center gap-2 text-sm"><input v-model="u.is_active" type="checkbox">Active</label><UiButton size="sm" @click="save(u)"><Save class="h-4 w-4"/>Save</UiButton><div class="md:col-span-5"><UiInput v-model="u.newPassword" type="password" placeholder="Password baru (opsional)"/></div></div></div></UiCard><UiCard class="h-fit p-5"><h2 class="mb-4 font-semibold">Tambah user</h2><div class="space-y-3"><UiInput v-model="addForm.name" placeholder="Nama"/><UiInput v-model="addForm.email" type="email" placeholder="Email"/><UiInput v-model="addForm.password" type="password" placeholder="Password min. 8 karakter"/><UiSelect v-model="addForm.role"><option value="editor">GIS Editor</option><option value="manager">GIS Manager</option><option value="admin">Admin</option></UiSelect><UiButton class="w-full" @click="add"><Plus class="h-4 w-4"/>Tambah User</UiButton></div></UiCard></div></div></template>
++<template><div class="space-y-6"><UiPageHeader title="Users" description="Kelola akun dan peran Admin, GIS Manager, serta GIS Editor."/><div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div><div class="grid gap-4 xl:grid-cols-[1fr_360px]"><UiCard class="overflow-hidden"><div class="divide-y"><div v-for="u in data?.users||[]" :key="u.id" class="grid gap-3 p-5 md:grid-cols-[1fr_1fr_160px_130px_auto]"><UiInput v-model="u.name"/><UiInput v-model="u.email"/><UiSelect v-model="u.role"><option value="admin">Admin</option><option value="manager">GIS Manager</option><option value="editor">GIS Editor</option></UiSelect><label class="flex items-center gap-2 text-sm"><input v-model="u.is_active" type="checkbox">Aktif</label><UiButton size="sm" @click="save(u)"><Save class="h-4 w-4"/>Simpan</UiButton><div class="md:col-span-5"><UiInput v-model="u.newPassword" type="password" placeholder="Kata sandi baru (opsional)"/></div></div></div></UiCard><UiCard class="h-fit p-5"><h2 class="mb-4 font-semibold">Tambah User</h2><div class="space-y-3"><UiInput v-model="addForm.name" placeholder="Nama"/><UiInput v-model="addForm.email" type="email" placeholder="Email"/><UiInput v-model="addForm.password" type="password" placeholder="Kata sandi min. 8 karakter"/><UiSelect v-model="addForm.role"><option value="editor">GIS Editor</option><option value="manager">GIS Manager</option><option value="admin">Admin</option></UiSelect><UiButton class="w-full" @click="add"><Plus class="h-4 w-4"/>Tambah User</UiButton></div></UiCard></div></div></template>
+diff --git a/app/pages/index.vue b/app/pages/index.vue
+index 2abddb4..fc11963 100644
+--- a/app/pages/index.vue
++++ b/app/pages/index.vue
+@@ -8,6 +8,11 @@ const district = ref('')
+ const status = ref('')
+ const year = ref('')
+ const search = ref('')
++const isAuthenticated = computed(() => Boolean(meta.value?.authenticated))
++
++watch(isAuthenticated, (loggedIn) => {
++  if (!loggedIn) year.value = ''
++})
+ </script>
+ 
+ <template>
+@@ -15,29 +20,32 @@ const search = ref('')
+     <header class="z-20 flex h-16 shrink-0 items-center justify-between border-b bg-white px-4 md:px-6">
+       <div class="flex items-center gap-3">
+         <div class="rounded-xl bg-teal-700 p-2 text-white"><Map class="h-5 w-5" /></div>
+-        <div><h1 class="font-bold tracking-tight text-slate-950">Transportation GIS</h1><p class="hidden text-xs text-slate-500 sm:block">Peta fasilitas transportasi</p></div>
++        <div><h1 class="font-bold tracking-tight text-slate-950">Peta Perlengkapan Jalan</h1><p class="hidden text-xs text-slate-500 sm:block">Peta fasilitas transportasi</p></div>
+       </div>
+       <NuxtLink to="/admin" class="inline-flex h-9 items-center gap-2 rounded-lg border bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"><Shield class="h-4 w-4 text-teal-700" />Admin</NuxtLink>
+     </header>
+     <div class="relative min-h-0 flex-1">
+       <PublicMap :category="category" :district="district" :status="status" :year="year" :search="search" />
+       <div class="absolute left-4 top-4 z-[500] max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-2xl border bg-white/95 p-4 shadow-soft backdrop-blur md:left-6 md:top-6 md:max-h-[calc(100%-3rem)]">
+-        <div class="mb-4"><h2 class="font-semibold text-slate-950">Jelajahi data GIS</h2><p class="mt-1 text-xs text-slate-500">Filter titik berdasarkan kategori, kecamatan, status, atau tahun anggaran.</p></div>
++        <div class="mb-4">
++          <h2 class="font-semibold text-slate-950">Jelajahi Peta Perlengkapan Jalan</h2>
++          <p class="mt-1 text-xs text-slate-500">Filter titik berdasarkan kategori, kecamatan, status<span v-if="isAuthenticated">, atau tahun anggaran</span>.</p>
++        </div>
+         <div class="space-y-3">
+           <div class="relative"><Search class="absolute left-3 top-3 h-4 w-4 text-slate-400" /><UiInput v-model="search" class="pl-9" placeholder="Cari lokasi..." /></div>
+           <div class="grid grid-cols-2 gap-2">
+             <UiSelect v-model="category"><option value="">Semua kategori</option><option v-for="c in meta?.categories || []" :key="c.id" :value="c.id">{{ c.name }}</option></UiSelect>
+             <UiSelect v-model="district"><option value="">Semua kecamatan</option><option v-for="d in meta?.districts || []" :key="d.id" :value="d.id">{{ d.name }}</option></UiSelect>
+           </div>
+-          <div class="grid grid-cols-2 gap-2">
+-            <UiSelect v-model="status"><option value="">Semua status</option><option value="EXISTING">Eksisting</option><option value="PLANNED">Direncanakan</option></UiSelect>
+-            <UiSelect v-model="year"><option value="">Semua tahun</option><option v-for="y in meta?.years || []" :key="y" :value="y">{{ y }}</option></UiSelect>
++          <div class="grid gap-2" :class="isAuthenticated ? 'grid-cols-2' : 'grid-cols-1'">
++            <UiSelect v-model="status"><option value="">Semua status</option><option value="EXISTING">Terpasang</option><option value="PLANNED">Direncanakan</option></UiSelect>
++            <UiSelect v-if="isAuthenticated" v-model="year"><option value="">Semua tahun</option><option v-for="y in meta?.years || []" :key="y" :value="y">{{ y }}</option></UiSelect>
+           </div>
+         </div>
+         <div class="mt-4 border-t pt-3">
+           <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Legenda status</div>
+           <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
+-            <div class="flex items-center gap-2"><span class="h-4 w-4 rounded-full border-2 border-white bg-teal-700 shadow"></span>Eksisting</div>
++            <div class="flex items-center gap-2"><span class="h-4 w-4 rounded-full border-2 border-white bg-teal-700 shadow"></span>Terpasang</div>
+             <div class="flex items-center gap-2"><span class="h-4 w-4 rounded-full border-2 border-dashed border-teal-700 bg-white"></span>Direncanakan</div>
+           </div>
+           <div v-if="meta?.categories?.length" class="mt-3 flex flex-wrap gap-2">
+diff --git a/nuxt.config.ts b/nuxt.config.ts
+index f4b619f..fad0b6b 100644
+--- a/nuxt.config.ts
++++ b/nuxt.config.ts
+@@ -10,7 +10,7 @@ export default defineNuxtConfig({
+     adminPassword: process.env.NUXT_ADMIN_PASSWORD,
+     storageDir: process.env.STORAGE_DIR || '/app/storage',
+     public: {
+-      appName: process.env.NUXT_PUBLIC_APP_NAME || 'Transportation GIS'
++      appName: process.env.NUXT_PUBLIC_APP_NAME || 'Peta Perlengkapan Jalan'
+     }
+   },
+   nitro: {
+@@ -18,7 +18,7 @@ export default defineNuxtConfig({
+   },
+   app: {
+     head: {
+-      title: 'Transportation GIS',
++      title: 'Peta Perlengkapan Jalan',
+       meta: [
+         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+         { name: 'theme-color', content: '#0f766e' }
+diff --git a/package.json b/package.json
+index f7c7450..5ea75bc 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "transportation-gis",
+-  "version": "0.3.0",
++  "version": "0.3.1",
+   "private": true,
+   "type": "module",
+   "scripts": {
+diff --git a/public/templates/Template_Import_Transportation_GIS_v0.3.xlsx b/public/templates/Template_Import_Transportation_GIS_v0.3.xlsx
+index 75e0dc53eb3c57368ae9b587d8868fabd6c52df5..c2b25febde2c51fca63f0e84d9079366852594c4 100644
+GIT binary patch
+delta 4691
+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
+
+delta 4736
+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
+
+diff --git a/server/api/admin/categories/[id].put.ts b/server/api/admin/categories/[id].put.ts
+index 5626687..7af179f 100644
+--- a/server/api/admin/categories/[id].put.ts
++++ b/server/api/admin/categories/[id].put.ts
+@@ -2,7 +2,7 @@ import { z } from 'zod'
+ import { requireUser } from '../../../utils/auth'
+ import { q } from '../../../utils/db'
+ 
+-const iconKeys = ['map-pin','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
++const iconKeys = ['map-pin','speed-bump','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
+ 
+ export default defineEventHandler(async (event) => {
+   await requireUser(event, ['admin','manager'])
+diff --git a/server/api/admin/categories/index.post.ts b/server/api/admin/categories/index.post.ts
+index 05e326c..c314268 100644
+--- a/server/api/admin/categories/index.post.ts
++++ b/server/api/admin/categories/index.post.ts
+@@ -2,7 +2,7 @@ import { z } from 'zod'
+ import { requireUser } from '../../../utils/auth'
+ import { q } from '../../../utils/db'
+ 
+-const iconKeys = ['map-pin','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
++const iconKeys = ['map-pin','speed-bump','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
+ 
+ export default defineEventHandler(async (event) => {
+   await requireUser(event, ['admin','manager'])
+diff --git a/server/api/admin/imports/[id]/rollback.post.ts b/server/api/admin/imports/[id]/rollback.post.ts
+index e5d3f38..c7e1cc5 100644
+--- a/server/api/admin/imports/[id]/rollback.post.ts
++++ b/server/api/admin/imports/[id]/rollback.post.ts
+@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
+   const id=getRouterParam(event,'id')!
+   const batch=await q('SELECT * FROM import_batches WHERE id=$1',[id])
+   if(!batch.rows[0]) throw createError({statusCode:404})
+-  if(batch.rows[0].rolled_back_at) throw createError({statusCode:400,statusMessage:'Import ini sudah di-rollback'})
++  if(batch.rows[0].rolled_back_at) throw createError({statusCode:400,statusMessage:'Impor ini sudah di-rollback'})
+   const modified=await q('SELECT count(*)::int count FROM locations WHERE import_batch_id=$1 AND deleted_at IS NULL AND modified_after_import=true',[id])
+   const rollbackable=await q('SELECT count(*)::int count FROM locations WHERE import_batch_id=$1 AND deleted_at IS NULL AND modified_after_import=false',[id])
+   await q('UPDATE locations SET deleted_at=now(),updated_at=now() WHERE import_batch_id=$1 AND deleted_at IS NULL AND modified_after_import=false',[id])
+diff --git a/server/api/admin/imports/commit.post.ts b/server/api/admin/imports/commit.post.ts
+index 40ceaaf..7c7e43a 100644
+--- a/server/api/admin/imports/commit.post.ts
++++ b/server/api/admin/imports/commit.post.ts
+@@ -8,9 +8,9 @@ export default defineEventHandler(async (event) => {
+   const body = await readBody(event)
+   const token = String(body?.token || '')
+   const skipDuplicates = body?.skipDuplicates !== false
+-  if (!token) throw createError({ statusCode:400, statusMessage:'Preview token tidak valid' })
++  if (!token) throw createError({ statusCode:400, statusMessage:'Token pratinjau tidak valid' })
+   const temp = await findTempImport(token)
+-  if (!temp) throw createError({ statusCode:400, statusMessage:'File preview sudah tidak tersedia. Upload ulang file.' })
++  if (!temp) throw createError({ statusCode:400, statusMessage:'File pratinjau sudah tidak tersedia. Unggah ulang file.' })
+   const originalName = temp.filename.replace(`${token}-`, '')
+   const parsed = await parseWorkbook(temp.buffer)
+   const rows = await validateRows(parsed, skipDuplicates)
+diff --git a/server/api/auth/login.post.ts b/server/api/auth/login.post.ts
+index 80f72de..c4ecde7 100644
+--- a/server/api/auth/login.post.ts
++++ b/server/api/auth/login.post.ts
+@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
+   const body = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(await readBody(event))
+   const result = await q('SELECT id,email,name,role,password_hash FROM users WHERE lower(email)=lower($1) AND is_active=true LIMIT 1', [body.email])
+   const user = result.rows[0] as any
+-  if (!user || !(await bcrypt.compare(body.password, user.password_hash))) throw createError({ statusCode: 401, statusMessage: 'Email atau password salah' })
++  if (!user || !(await bcrypt.compare(body.password, user.password_hash))) throw createError({ statusCode: 401, statusMessage: 'Email atau kata sandi salah' })
+   await createSession(event, user.id)
+   return { user: { id: user.id, email: user.email, name: user.name, role: user.role } }
+ })
+diff --git a/server/api/media/[file].get.ts b/server/api/media/[file].get.ts
+index 6ce7160..e7603b9 100644
+--- a/server/api/media/[file].get.ts
++++ b/server/api/media/[file].get.ts
+@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
+     setHeader(event, 'Content-Type', types[ext] || 'application/octet-stream')
+     setHeader(event, 'Cache-Control', 'public, max-age=86400')
+     return data
+-  } catch { throw createError({ statusCode: 404, statusMessage: 'File not found' }) }
++  } catch { throw createError({ statusCode: 404, statusMessage: 'File tidak ditemukan' }) }
+ })
+diff --git a/server/api/public/locations.get.ts b/server/api/public/locations.get.ts
+index 7a223b8..396c5b4 100644
+--- a/server/api/public/locations.get.ts
++++ b/server/api/public/locations.get.ts
+@@ -1,6 +1,8 @@
+ import { q } from '../../utils/db'
++import { getSessionUser } from '../../utils/auth'
+ 
+ export default defineEventHandler(async (event) => {
++  const user = await getSessionUser(event)
+   const query = getQuery(event)
+   const west = Number(query.west ?? 106.65)
+   const south = Number(query.south ?? -6.4)
+@@ -14,12 +16,13 @@ export default defineEventHandler(async (event) => {
+   ]
+   if (query.category) { params.push(String(query.category)); where.push(`l.category_id=$${params.length}`) }
+   if (query.district) { params.push(String(query.district)); where.push(`l.district_id=$${params.length}`) }
+-  if (query.year) { params.push(Number(query.year)); where.push(`l.fiscal_year=$${params.length}`) }
++  if (user && query.year) { params.push(Number(query.year)); where.push(`l.fiscal_year=$${params.length}`) }
+   if (query.status) { params.push(String(query.status)); where.push(`l.implementation_status=$${params.length}`) }
+   if (query.search) { params.push(`%${String(query.search)}%`); where.push(`l.location_name ILIKE $${params.length}`) }
+ 
++  const fiscalYearSelect = user ? 'l.fiscal_year' : 'NULL::integer AS fiscal_year'
+   const result = await q(`
+-    SELECT l.id,l.latitude,l.longitude,l.photo_path,l.fiscal_year,l.implementation_status,
++    SELECT l.id,l.location_name,l.latitude,l.longitude,l.photo_path,${fiscalYearSelect},l.implementation_status,
+            c.name category,c.color category_color,c.icon_key category_icon_key,
+            COALESCE(d.name,l.district_raw) district
+     FROM locations l
+diff --git a/server/api/public/meta.get.ts b/server/api/public/meta.get.ts
+index b8e6014..a0f132a 100644
+--- a/server/api/public/meta.get.ts
++++ b/server/api/public/meta.get.ts
+@@ -1,17 +1,23 @@
+ import { q } from '../../utils/db'
++import { getSessionUser } from '../../utils/auth'
+ 
+-export default defineEventHandler(async () => {
+-  const [c,d,y] = await Promise.all([
++export default defineEventHandler(async (event) => {
++  const user = await getSessionUser(event)
++  const [categories, districts, years] = await Promise.all([
+     q('SELECT id,name,color,icon_key FROM categories ORDER BY name'),
+     q('SELECT id,name FROM districts ORDER BY name'),
+-    q('SELECT DISTINCT fiscal_year FROM locations WHERE deleted_at IS NULL AND fiscal_year IS NOT NULL ORDER BY fiscal_year DESC')
++    user
++      ? q('SELECT DISTINCT fiscal_year FROM locations WHERE deleted_at IS NULL AND fiscal_year IS NOT NULL ORDER BY fiscal_year DESC')
++      : Promise.resolve({ rows: [] } as any)
+   ])
++
+   return {
+-    categories: c.rows,
+-    districts: d.rows,
+-    years: y.rows.map((r:any)=>r.fiscal_year),
++    authenticated: Boolean(user),
++    categories: categories.rows,
++    districts: districts.rows,
++    years: user ? years.rows.map((r:any) => r.fiscal_year) : [],
+     statuses: [
+-      { value:'EXISTING', label:'Eksisting' },
++      { value:'EXISTING', label:'Terpasang' },
+       { value:'PLANNED', label:'Direncanakan' }
+     ]
+   }
+diff --git a/server/plugins/database.ts b/server/plugins/database.ts
+index 2d7d65e..3bc5b3f 100644
+--- a/server/plugins/database.ts
++++ b/server/plugins/database.ts
+@@ -151,7 +151,8 @@ export default defineNitroPlugin(async () => {
+ 
+   for (const name of districts) await q('INSERT INTO districts(name) VALUES($1) ON CONFLICT(name) DO NOTHING', [name])
+   await q(`UPDATE locations l SET district_id=d.id, district_raw=NULL FROM districts d WHERE l.district_id IS NULL AND l.district_raw IS NOT NULL AND lower(trim(l.district_raw))=lower(d.name)`)
+-  await q(`INSERT INTO categories(name,color,icon_key) VALUES('Speed Bump','#F59E0B','traffic-cone') ON CONFLICT(name) DO NOTHING`)
++  await q(`INSERT INTO categories(name,color,icon_key) VALUES('Speed Bump','#F59E0B','speed-bump') ON CONFLICT(name) DO NOTHING`)
++  await q("UPDATE categories SET icon_key='speed-bump',updated_at=now() WHERE lower(trim(name)) IN ('speed bump','speedbump') AND icon_key IN ('map-pin','traffic-cone')")
+ 
+   const config = useRuntimeConfig()
+   if (config.adminEmail && config.adminPassword) {
+diff --git a/server/utils/auth.ts b/server/utils/auth.ts
+index 609a7b9..841db3a 100644
+--- a/server/utils/auth.ts
++++ b/server/utils/auth.ts
+@@ -49,7 +49,7 @@ export async function getSessionUser(event: H3Event) {
+ 
+ export async function requireUser(event: H3Event, roles?: string[]) {
+   const user = await getSessionUser(event)
+-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
+-  if (roles && !roles.includes(user.role)) throw createError({ statusCode: 403, statusMessage: 'Insufficient permission' })
++  if (!user) throw createError({ statusCode: 401, statusMessage: 'Autentikasi diperlukan' })
++  if (roles && !roles.includes(user.role)) throw createError({ statusCode: 403, statusMessage: 'Hak akses tidak mencukupi' })
+   return user
+ }
+diff --git a/server/utils/importer.ts b/server/utils/importer.ts
+index 039af2d..189beef 100644
+--- a/server/utils/importer.ts
++++ b/server/utils/importer.ts
+@@ -37,6 +37,7 @@ const conditionMap: Record<string, string> = {
+ const implementationStatusMap: Record<string, 'EXISTING' | 'PLANNED'> = {
+   existing: 'EXISTING',
+   eksisting: 'EXISTING',
++  terpasang: 'EXISTING',
+   planned: 'PLANNED',
+   direncanakan: 'PLANNED',
+   rencana: 'PLANNED'
+@@ -129,7 +130,7 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
+ 
+     if (row.fiscalYear != null && (row.fiscalYear < 2000 || row.fiscalYear > 2100)) { status='skip'; reasons.push('Tahun Anggaran tidak valid') }
+     if (!row.districtName) { status='skip'; reasons.push('Kecamatan kosong') }
+-    else if (!district && status !== 'skip') { status='warning'; reasons.push(`Kecamatan "${row.districtName}" tidak dikenali. Data tetap diimport sebagai draft internal dan tidak tampil di peta publik sampai diperbaiki dari Edit Location.`) }
++    else if (!district && status !== 'skip') { status='warning'; reasons.push(`Kecamatan "${row.districtName}" tidak dikenali. Data tetap diimpor sebagai draft internal dan tidak tampil di peta publik sampai diperbaiki dari Edit Lokasi.`) }
+     if (!row.locationName) { status='skip'; reasons.push('Lokasi Kegiatan kosong') }
+     if (row.latitude == null || row.latitude < -90 || row.latitude > 90) { status='skip'; reasons.push('Latitude tidak valid') }
+     if (row.longitude == null || row.longitude < -180 || row.longitude > 180) { status='skip'; reasons.push('Longitude tidak valid') }
+@@ -139,7 +140,7 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
+     if (row.implementationStatus) {
+       const mapped = implementationStatusMap[row.implementationStatus.trim().toLowerCase()]
+       if (mapped) normalizedImplementationStatus = mapped
+-      else { status='skip'; reasons.push(`Status "${row.implementationStatus}" tidak dikenali. Gunakan Eksisting atau Direncanakan.`) }
++      else { status='skip'; reasons.push(`Status "${row.implementationStatus}" tidak dikenali. Gunakan Terpasang atau Direncanakan.`) }
+     }
+ 
+     let normalizedCondition: string | null = 'Belum Dinilai'

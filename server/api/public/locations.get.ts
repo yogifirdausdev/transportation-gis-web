@@ -1,6 +1,8 @@
 import { q } from '../../utils/db'
+import { getSessionUser } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
+  const user = await getSessionUser(event)
   const query = getQuery(event)
   const west = Number(query.west ?? 106.65)
   const south = Number(query.south ?? -6.4)
@@ -14,12 +16,13 @@ export default defineEventHandler(async (event) => {
   ]
   if (query.category) { params.push(String(query.category)); where.push(`l.category_id=$${params.length}`) }
   if (query.district) { params.push(String(query.district)); where.push(`l.district_id=$${params.length}`) }
-  if (query.year) { params.push(Number(query.year)); where.push(`l.fiscal_year=$${params.length}`) }
+  if (user && query.year) { params.push(Number(query.year)); where.push(`l.fiscal_year=$${params.length}`) }
   if (query.status) { params.push(String(query.status)); where.push(`l.implementation_status=$${params.length}`) }
   if (query.search) { params.push(`%${String(query.search)}%`); where.push(`l.location_name ILIKE $${params.length}`) }
 
+  const fiscalYearSelect = user ? 'l.fiscal_year' : 'NULL::integer AS fiscal_year'
   const result = await q(`
-    SELECT l.id,l.latitude,l.longitude,l.photo_path,l.fiscal_year,l.implementation_status,
+    SELECT l.id,l.location_name,l.latitude,l.longitude,l.photo_path,${fiscalYearSelect},l.implementation_status,
            c.name category,c.color category_color,c.icon_key category_icon_key,
            COALESCE(d.name,l.district_raw) district
     FROM locations l

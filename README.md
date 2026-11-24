@@ -1,21 +1,21 @@
-# Transportation GIS v0.3
+# Peta Perlengkapan Jalan v0.3.1
 
-Standalone GIS web application for managing and publishing transportation facility points. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
+Aplikasi GIS mandiri untuk mengelola dan memublikasikan titik perlengkapan jalan dan fasilitas transportasi. Built with Nuxt, shadcn-style Vue components, Leaflet, PostgreSQL/PostGIS, and Docker.
 
-## v0.3 scope
+## Cakupan v0.3.1
 
 - Transit Teal UI refresh based on shadcn UI patterns
 - Resilient public Leaflet map lifecycle
 - Public/Admin field separation
-- Public popup: photo, category, district, coordinates
+- Popup peta: foto, kategori, lokasi, kecamatan, koordinat; Tahun Anggaran hanya untuk user login
 - Admin-only condition and source metadata
 - 44 DKI Jakarta districts as application master data
 - Optional location fiscal year (`Tahun Anggaran`)
-- Implementation status: `EXISTING` / `PLANNED`
+- Status implementasi internal: `EXISTING` / `PLANNED`, ditampilkan sebagai `Terpasang` / `Direncanakan`
 - Single photo per location
-- Category marker color and icon can be edited after category creation
+- Warna dan ikon marker kategori dapat diedit; pemilihan ikon menggunakan visual icon picker
 - Standard Excel template import
-- Import preview with `Valid`, `Warning`, and `Will not import` rows plus reasons
+- Pratinjau impor dengan status `Valid`, `Peringatan`, dan `Tidak Diimpor` beserta alasan
 - Source tracking: Manual or Excel filename + source row + import batch
 - Import history and safe rollback
 - DB-backed admin session designed to work behind Caddy
@@ -71,7 +71,7 @@ The `Template Import` sheet uses one row per GIS point:
 | Latitude | Yes | Jakarta should be negative, e.g. `-6.1433398` |
 | Longitude | Yes | e.g. `106.7850379` |
 | Kategori | Yes | e.g. `Speed Bump` |
-| Status | No | `Eksisting` or `Direncanakan`. Blank defaults to `Eksisting` |
+| Status | No | `Terpasang` atau `Direncanakan`. Kosong dianggap `Terpasang`. Nilai lama `Eksisting` tetap diterima |
 | Kondisi | No | Internal only. Unknown/blank values become `Belum Dinilai` with warning |
 | Foto | No | One embedded photo per row |
 
@@ -148,7 +148,7 @@ git diff --stat
 Suggested commit:
 
 ```text
-feat: implement Transportation GIS v0.3
+feat: revise public visibility and Indonesian UI
 ```
 
 ## Database upgrade warning
@@ -176,8 +176,9 @@ Public API intentionally returns only:
 - photo
 - category
 - district
-- fiscal year (for filtering)
+- fiscal year only when the requester has an authenticated session
 - implementation status
+- location name
 - category icon key
 
 It does not send `condition`, source filename, source row, import batch, or other internal metadata.

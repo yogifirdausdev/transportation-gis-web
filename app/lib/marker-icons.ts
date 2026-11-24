@@ -11,18 +11,23 @@ export const markerIconOptions: MarkerIconOption[] = [
     body: '<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'
   },
   {
+    key: 'speed-bump',
+    label: 'Speed Bump',
+    body: '<path d="M3 17h3c1.4 0 2.1-7 6-7s4.6 7 6 7h3"/><path d="M3 20h18"/><path d="M9 14h6"/>'
+  },
+  {
     key: 'camera',
     label: 'Kamera / CCTV',
     body: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3"/>'
   },
   {
     key: 'traffic-cone',
-    label: 'Traffic Cone',
+    label: 'Kerucut Lalu Lintas',
     body: '<path d="M10.83 2.38a2 2 0 0 1 2.34 0L19 20H5L10.83 2.38Z"/><path d="M8.5 8h7M7 13h10M3 20h18"/>'
   },
   {
     key: 'signpost',
-    label: 'Rambu / Signpost',
+    label: 'Rambu',
     body: '<path d="M12 3v18M5 6h14l2 3-2 3H5L3 9l2-3Z"/>'
   },
   {

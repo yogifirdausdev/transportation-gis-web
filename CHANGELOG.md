@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1
+
+- Renamed the application to **Peta Perlengkapan Jalan**
+- Changed the visible `Eksisting` label to **Terpasang** while keeping internal `EXISTING` values for compatibility
+- Added `Lokasi` to public marker popups
+- Restricted public `Tahun Anggaran` data and year filtering to authenticated users
+- Added a dedicated Speed Bump marker icon
+- Replaced text-based category icon selects with a visual icon picker
+- Localized the main admin/public interface to Bahasa Indonesia while keeping Dashboard and Users
+- Updated Excel template wording to use **Terpasang** and kept legacy **Eksisting** import compatibility
+
 ## 0.3.0
 
 - Added selectable icon per category
