@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
     setHeader(event, 'Content-Type', types[ext] || 'application/octet-stream')
     setHeader(event, 'Cache-Control', 'public, max-age=86400')
     return data
-  } catch { throw createError({ statusCode: 404, statusMessage: 'File not found' }) }
+  } catch { throw createError({ statusCode: 404, statusMessage: 'File tidak ditemukan' }) }
 })

@@ -37,6 +37,7 @@ const conditionMap: Record<string, string> = {
 const implementationStatusMap: Record<string, 'EXISTING' | 'PLANNED'> = {
   existing: 'EXISTING',
   eksisting: 'EXISTING',
+  terpasang: 'EXISTING',
   planned: 'PLANNED',
   direncanakan: 'PLANNED',
   rencana: 'PLANNED'
@@ -129,7 +130,7 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
 
     if (row.fiscalYear != null && (row.fiscalYear < 2000 || row.fiscalYear > 2100)) { status='skip'; reasons.push('Tahun Anggaran tidak valid') }
     if (!row.districtName) { status='skip'; reasons.push('Kecamatan kosong') }
-    else if (!district && status !== 'skip') { status='warning'; reasons.push(`Kecamatan "${row.districtName}" tidak dikenali. Data tetap diimport sebagai draft internal dan tidak tampil di peta publik sampai diperbaiki dari Edit Location.`) }
+    else if (!district && status !== 'skip') { status='warning'; reasons.push(`Kecamatan "${row.districtName}" tidak dikenali. Data tetap diimpor sebagai draft internal dan tidak tampil di peta publik sampai diperbaiki dari Edit Lokasi.`) }
     if (!row.locationName) { status='skip'; reasons.push('Lokasi Kegiatan kosong') }
     if (row.latitude == null || row.latitude < -90 || row.latitude > 90) { status='skip'; reasons.push('Latitude tidak valid') }
     if (row.longitude == null || row.longitude < -180 || row.longitude > 180) { status='skip'; reasons.push('Longitude tidak valid') }
@@ -139,7 +140,7 @@ export async function validateRows(rows: ParsedRow[], skipDuplicates = true): Pr
     if (row.implementationStatus) {
       const mapped = implementationStatusMap[row.implementationStatus.trim().toLowerCase()]
       if (mapped) normalizedImplementationStatus = mapped
-      else { status='skip'; reasons.push(`Status "${row.implementationStatus}" tidak dikenali. Gunakan Eksisting atau Direncanakan.`) }
+      else { status='skip'; reasons.push(`Status "${row.implementationStatus}" tidak dikenali. Gunakan Terpasang atau Direncanakan.`) }
     }
 
     let normalizedCondition: string | null = 'Belum Dinilai'

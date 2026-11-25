@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { requireUser } from '../../../utils/auth'
 import { q } from '../../../utils/db'
 
-const iconKeys = ['map-pin','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
+const iconKeys = ['map-pin','speed-bump','camera','traffic-cone','signpost','lightbulb','bus-front','construction','triangle-alert'] as const
 
 export default defineEventHandler(async (event) => {
   await requireUser(event, ['admin','manager'])

@@ -49,8 +49,8 @@
 
 .gis-marker {
   display: flex;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
@@ -68,4 +68,23 @@
   color: var(--marker-color);
   background: rgba(255, 255, 255, 0.96);
   border: 3px dashed var(--marker-color);
+}
+
+/* Secondary action in an authenticated location popup. */
+.leaflet-popup-content a.gis-popup-edit {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+.leaflet-popup-content a.gis-popup-edit:hover {
+  background: #f0fdfa;
+}
+.leaflet-popup-content a.gis-popup-edit:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
 }

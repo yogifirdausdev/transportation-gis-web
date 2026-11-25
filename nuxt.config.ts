@@ -10,7 +10,7 @@ export default defineNuxtConfig({
     adminPassword: process.env.NUXT_ADMIN_PASSWORD,
     storageDir: process.env.STORAGE_DIR || '/app/storage',
     public: {
-      appName: process.env.NUXT_PUBLIC_APP_NAME || 'Transportation GIS'
+      appName: process.env.NUXT_PUBLIC_APP_NAME || 'Peta Perlengkapan Jalan'
     }
   },
   nitro: {
@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Transportation GIS',
+      title: 'Peta Perlengkapan Jalan',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#0f766e' }

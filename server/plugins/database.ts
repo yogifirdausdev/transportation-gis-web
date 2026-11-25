@@ -151,7 +151,8 @@ export default defineNitroPlugin(async () => {
 
   for (const name of districts) await q('INSERT INTO districts(name) VALUES($1) ON CONFLICT(name) DO NOTHING', [name])
   await q(`UPDATE locations l SET district_id=d.id, district_raw=NULL FROM districts d WHERE l.district_id IS NULL AND l.district_raw IS NOT NULL AND lower(trim(l.district_raw))=lower(d.name)`)
-  await q(`INSERT INTO categories(name,color,icon_key) VALUES('Speed Bump','#F59E0B','traffic-cone') ON CONFLICT(name) DO NOTHING`)
+  await q(`INSERT INTO categories(name,color,icon_key) VALUES('Speed Bump','#F59E0B','speed-bump') ON CONFLICT(name) DO NOTHING`)
+  await q("UPDATE categories SET icon_key='speed-bump',updated_at=now() WHERE lower(trim(name)) IN ('speed bump','speedbump') AND icon_key IN ('map-pin','traffic-cone')")
 
   const config = useRuntimeConfig()
   if (config.adminEmail && config.adminPassword) {
