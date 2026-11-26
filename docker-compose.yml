@@ -23,8 +23,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://gis:gis@db:5432/gis}
-      STORAGE_DIR: /app/storage
+      NUXT_DATABASE_URL: ${NUXT_DATABASE_URL:-postgresql://${POSTGRES_USER:-gis}:${POSTGRES_PASSWORD:-gis}@db:5432/${POSTGRES_DB:-gis}}
+      NUXT_STORAGE_DIR: /app/storage
     volumes:
       - gis_storage:/app/storage
     ports:

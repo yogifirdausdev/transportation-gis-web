@@ -1,14 +1,266 @@
 <script setup lang="ts">
-import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Download } from 'lucide-vue-next'
-definePageMeta({layout:'admin',middleware:'admin'})
-const file=ref<File|null>(null); const skipDuplicates=ref(true); const loading=ref(false); const committing=ref(false); const error=ref(''); const preview=ref<any>(null); const result=ref<any>(null)
-function onFile(e:Event){file.value=(e.target as HTMLInputElement).files?.[0]||null;preview.value=null;result.value=null}
-async function doPreview(){if(!file.value)return;loading.value=true;error.value='';try{const fd=new FormData();fd.append('file',file.value);fd.append('skip_duplicates',String(skipDuplicates.value));preview.value=await $fetch('/api/admin/imports/preview',{method:'POST',body:fd})}catch(e:any){error.value=e?.data?.statusMessage||'Pratinjau gagal'}finally{loading.value=false}}
-async function commit(){if(!preview.value)return;committing.value=true;error.value='';try{result.value=await $fetch('/api/admin/imports/commit',{method:'POST',body:{token:preview.value.token,skipDuplicates:skipDuplicates.value}});preview.value=null;file.value=null}catch(e:any){error.value=e?.data?.statusMessage||'Impor gagal'}finally{committing.value=false}}
-function rowClass(row:any){return row.status==='skip'?'bg-red-50/80':row.status==='warning'?'bg-amber-50/70':'bg-white'}
+import {
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Download,
+} from "lucide-vue-next";
+definePageMeta({ layout: "admin", middleware: "admin" });
+const baseURL = useRuntimeConfig().app.baseURL.replace(/\/+$/, "");
+const templateUrl = `${baseURL}/templates/Template_Import_Transportation_GIS_v0.3.xlsx`;
+const file = ref<File | null>(null);
+const skipDuplicates = ref(true);
+const loading = ref(false);
+const committing = ref(false);
+const error = ref("");
+const preview = ref<any>(null);
+const result = ref<any>(null);
+function onFile(e: Event) {
+  file.value = (e.target as HTMLInputElement).files?.[0] || null;
+  preview.value = null;
+  result.value = null;
+}
+async function doPreview() {
+  if (!file.value) return;
+  loading.value = true;
+  error.value = "";
+  try {
+    const fd = new FormData();
+    fd.append("file", file.value);
+    fd.append("skip_duplicates", String(skipDuplicates.value));
+    preview.value = await $fetch("/api/admin/imports/preview", {
+      method: "POST",
+      body: fd,
+    });
+  } catch (e: any) {
+    error.value = e?.data?.statusMessage || "Pratinjau gagal";
+  } finally {
+    loading.value = false;
+  }
+}
+async function commit() {
+  if (!preview.value) return;
+  committing.value = true;
+  error.value = "";
+  try {
+    result.value = await $fetch("/api/admin/imports/commit", {
+      method: "POST",
+      body: {
+        token: preview.value.token,
+        skipDuplicates: skipDuplicates.value,
+      },
+    });
+    preview.value = null;
+    file.value = null;
+  } catch (e: any) {
+    error.value = e?.data?.statusMessage || "Impor gagal";
+  } finally {
+    committing.value = false;
+  }
+}
+function rowClass(row: any) {
+  return row.status === "skip"
+    ? "bg-red-50/80"
+    : row.status === "warning"
+      ? "bg-amber-50/70"
+      : "bg-white";
+}
 </script>
-<template><div class="space-y-6"><UiPageHeader title="Impor Massal" description="Unggah template Excel standar, tinjau hasil validasi, lalu impor baris yang siap."><a href="/templates/Template_Import_Transportation_GIS_v0.3.xlsx" download><UiButton variant="outline"><Download class="h-4 w-4"/>Unduh Template</UiButton></a></UiPageHeader>
-<div v-if="error" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{error}}</div><div v-if="result" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"><div class="font-semibold">Impor selesai</div><div class="mt-1 text-sm">{{result.imported}} lokasi berhasil diimpor, {{result.skipped}} baris dilewati.</div></div>
-<UiCard class="p-5"><div class="grid gap-4 md:grid-cols-[1fr_auto]"><div><label class="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-slate-50 p-5 transition hover:bg-slate-100"><div class="rounded-xl bg-emerald-100 p-3 text-emerald-700"><FileSpreadsheet class="h-6 w-6"/></div><div class="min-w-0"><div class="font-medium">{{file?.name||'Pilih file .xlsx'}}</div><p class="mt-1 text-sm text-slate-500">Gunakan template standar Peta Perlengkapan Jalan v0.3.</p></div><input type="file" accept=".xlsx" class="hidden" @change="onFile"></label><label class="mt-3 flex items-center gap-2 text-sm text-slate-600"><input v-model="skipDuplicates" type="checkbox" class="rounded border-slate-300 text-teal-700 focus:ring-teal-500">Lewati potensi duplikat berdasarkan kategori + koordinat</label></div><div class="flex items-end"><UiButton :disabled="!file||loading" @click="doPreview"><Upload class="h-4 w-4"/>{{loading?'Memeriksa...':'Pratinjau File'}}</UiButton></div></div></UiCard>
-<template v-if="preview"><div class="grid gap-3 sm:grid-cols-4"><UiCard class="p-4"><div class="text-xs text-slate-500">Total Baris</div><div class="mt-1 text-2xl font-bold">{{preview.summary.total}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Siap</div><div class="mt-1 text-2xl font-bold text-emerald-700">{{preview.summary.ready}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Peringatan</div><div class="mt-1 text-2xl font-bold text-amber-700">{{preview.summary.warning}}</div></UiCard><UiCard class="p-4"><div class="text-xs text-slate-500">Tidak Diimpor</div><div class="mt-1 text-2xl font-bold text-red-700">{{preview.summary.skipped}}</div></UiCard></div>
-<UiCard class="overflow-hidden"><div class="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="font-semibold">Pratinjau Impor</h2><p class="mt-1 text-xs text-slate-500">Baris merah tidak akan diimpor. Lihat alasan pada kolom Validasi.</p></div><UiButton :disabled="committing||preview.summary.ready===0" @click="commit"><CheckCircle2 class="h-4 w-4"/>{{committing?'Mengimpor...':`Impor ${preview.summary.ready} Baris`}}</UiButton></div><div class="max-h-[620px] overflow-auto"><table class="w-full min-w-[1100px] text-left text-sm"><thead class="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-500"><tr><th class="px-3 py-3">Baris</th><th class="px-3 py-3">Validasi</th><th class="px-3 py-3">Tahun</th><th class="px-3 py-3">Kecamatan</th><th class="px-3 py-3">Lokasi</th><th class="px-3 py-3">Koordinat</th><th class="px-3 py-3">Kategori</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Kondisi</th><th class="px-3 py-3">Foto</th></tr></thead><tbody class="divide-y"><tr v-for="row in preview.rows" :key="row.rowNumber" :class="rowClass(row)"><td class="px-3 py-3 font-mono text-xs">{{row.rowNumber}}</td><td class="px-3 py-3"><div v-if="row.status==='valid'" class="flex items-center gap-1.5 text-emerald-700"><CheckCircle2 class="h-4 w-4"/>Valid</div><div v-else-if="row.status==='warning'" class="text-amber-800"><div class="flex items-center gap-1.5 font-medium"><AlertTriangle class="h-4 w-4"/>Peringatan</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div><div v-else class="text-red-700"><div class="flex items-center gap-1.5 font-semibold"><XCircle class="h-4 w-4"/>Dilewati</div><ul class="mt-1 list-disc pl-5 text-xs"><li v-for="r in row.reasons" :key="r">{{r}}</li></ul></div></td><td class="px-3 py-3">{{row.fiscalYear ?? '—'}}</td><td class="px-3 py-3">{{row.districtName}}</td><td class="max-w-sm px-3 py-3">{{row.locationName}}</td><td class="px-3 py-3 font-mono text-xs">{{row.latitude}}, {{row.longitude}}</td><td class="px-3 py-3">{{row.categoryName}}</td><td class="px-3 py-3"><UiBadge :variant="row.implementationStatus==='PLANNED'?'warning':'success'">{{row.implementationStatus==='PLANNED'?'Direncanakan':'Terpasang'}}</UiBadge></td><td class="px-3 py-3">{{row.condition}}</td><td class="px-3 py-3"><UiBadge :variant="row.hasPhoto?'success':'warning'">{{row.hasPhoto?'Ada':'Tidak ada'}}</UiBadge></td></tr></tbody></table></div></UiCard></template></div></template>
+<template>
+  <div class="space-y-6">
+    <UiPageHeader
+      title="Impor Massal"
+      description="Unggah template Excel standar, tinjau hasil validasi, lalu impor baris yang siap."
+      ><a :href="templateUrl" download
+        ><UiButton variant="outline"
+          ><Download class="h-4 w-4" />Unduh Template</UiButton
+        ></a
+      ></UiPageHeader
+    >
+    <div
+      v-if="error"
+      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+    >
+      {{ error }}
+    </div>
+    <div
+      v-if="result"
+      class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"
+    >
+      <div class="font-semibold">Impor selesai</div>
+      <div class="mt-1 text-sm">
+        {{ result.imported }} lokasi berhasil diimpor,
+        {{ result.skipped }} baris dilewati.
+      </div>
+    </div>
+    <UiCard class="p-5"
+      ><div class="grid gap-4 md:grid-cols-[1fr_auto]">
+        <div>
+          <label
+            class="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-slate-50 p-5 transition hover:bg-slate-100"
+            ><div class="rounded-xl bg-emerald-100 p-3 text-emerald-700">
+              <FileSpreadsheet class="h-6 w-6" />
+            </div>
+            <div class="min-w-0">
+              <div class="font-medium">
+                {{ file?.name || "Pilih file .xlsx" }}
+              </div>
+              <p class="mt-1 text-sm text-slate-500">
+                Gunakan template standar Peta Perlengkapan Jalan v0.3.
+              </p>
+            </div>
+            <input
+              type="file"
+              accept=".xlsx"
+              class="hidden"
+              @change="onFile" /></label
+          ><label class="mt-3 flex items-center gap-2 text-sm text-slate-600"
+            ><input
+              v-model="skipDuplicates"
+              type="checkbox"
+              class="rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+            />Lewati potensi duplikat berdasarkan kategori + koordinat</label
+          >
+        </div>
+        <div class="flex items-end">
+          <UiButton :disabled="!file || loading" @click="doPreview"
+            ><Upload class="h-4 w-4" />{{
+              loading ? "Memeriksa..." : "Pratinjau File"
+            }}</UiButton
+          >
+        </div>
+      </div></UiCard
+    >
+    <template v-if="preview"
+      ><div class="grid gap-3 sm:grid-cols-4">
+        <UiCard class="p-4"
+          ><div class="text-xs text-slate-500">Total Baris</div>
+          <div class="mt-1 text-2xl font-bold">
+            {{ preview.summary.total }}
+          </div></UiCard
+        ><UiCard class="p-4"
+          ><div class="text-xs text-slate-500">Siap</div>
+          <div class="mt-1 text-2xl font-bold text-emerald-700">
+            {{ preview.summary.ready }}
+          </div></UiCard
+        ><UiCard class="p-4"
+          ><div class="text-xs text-slate-500">Peringatan</div>
+          <div class="mt-1 text-2xl font-bold text-amber-700">
+            {{ preview.summary.warning }}
+          </div></UiCard
+        ><UiCard class="p-4"
+          ><div class="text-xs text-slate-500">Tidak Diimpor</div>
+          <div class="mt-1 text-2xl font-bold text-red-700">
+            {{ preview.summary.skipped }}
+          </div></UiCard
+        >
+      </div>
+      <UiCard class="overflow-hidden"
+        ><div
+          class="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <h2 class="font-semibold">Pratinjau Impor</h2>
+            <p class="mt-1 text-xs text-slate-500">
+              Baris merah tidak akan diimpor. Lihat alasan pada kolom Validasi.
+            </p>
+          </div>
+          <UiButton
+            :disabled="committing || preview.summary.ready === 0"
+            @click="commit"
+            ><CheckCircle2 class="h-4 w-4" />{{
+              committing
+                ? "Mengimpor..."
+                : `Impor ${preview.summary.ready} Baris`
+            }}</UiButton
+          >
+        </div>
+        <div class="max-h-[620px] overflow-auto">
+          <table class="w-full min-w-[1100px] text-left text-sm">
+            <thead
+              class="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-500"
+            >
+              <tr>
+                <th class="px-3 py-3">Baris</th>
+                <th class="px-3 py-3">Validasi</th>
+                <th class="px-3 py-3">Tahun</th>
+                <th class="px-3 py-3">Kecamatan</th>
+                <th class="px-3 py-3">Lokasi</th>
+                <th class="px-3 py-3">Koordinat</th>
+                <th class="px-3 py-3">Kategori</th>
+                <th class="px-3 py-3">Status</th>
+                <th class="px-3 py-3">Kondisi</th>
+                <th class="px-3 py-3">Foto</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr
+                v-for="row in preview.rows"
+                :key="row.rowNumber"
+                :class="rowClass(row)"
+              >
+                <td class="px-3 py-3 font-mono text-xs">{{ row.rowNumber }}</td>
+                <td class="px-3 py-3">
+                  <div
+                    v-if="row.status === 'valid'"
+                    class="flex items-center gap-1.5 text-emerald-700"
+                  >
+                    <CheckCircle2 class="h-4 w-4" />Valid
+                  </div>
+                  <div
+                    v-else-if="row.status === 'warning'"
+                    class="text-amber-800"
+                  >
+                    <div class="flex items-center gap-1.5 font-medium">
+                      <AlertTriangle class="h-4 w-4" />Peringatan
+                    </div>
+                    <ul class="mt-1 list-disc pl-5 text-xs">
+                      <li v-for="r in row.reasons" :key="r">{{ r }}</li>
+                    </ul>
+                  </div>
+                  <div v-else class="text-red-700">
+                    <div class="flex items-center gap-1.5 font-semibold">
+                      <XCircle class="h-4 w-4" />Dilewati
+                    </div>
+                    <ul class="mt-1 list-disc pl-5 text-xs">
+                      <li v-for="r in row.reasons" :key="r">{{ r }}</li>
+                    </ul>
+                  </div>
+                </td>
+                <td class="px-3 py-3">{{ row.fiscalYear ?? "—" }}</td>
+                <td class="px-3 py-3">{{ row.districtName }}</td>
+                <td class="max-w-sm px-3 py-3">{{ row.locationName }}</td>
+                <td class="px-3 py-3 font-mono text-xs">
+                  {{ row.latitude }}, {{ row.longitude }}
+                </td>
+                <td class="px-3 py-3">{{ row.categoryName }}</td>
+                <td class="px-3 py-3">
+                  <UiBadge
+                    :variant="
+                      row.implementationStatus === 'PLANNED'
+                        ? 'warning'
+                        : 'success'
+                    "
+                    >{{
+                      row.implementationStatus === "PLANNED"
+                        ? "Direncanakan"
+                        : "Terpasang"
+                    }}</UiBadge
+                  >
+                </td>
+                <td class="px-3 py-3">{{ row.condition }}</td>
+                <td class="px-3 py-3">
+                  <UiBadge :variant="row.hasPhoto ? 'success' : 'warning'">{{
+                    row.hasPhoto ? "Ada" : "Tidak ada"
+                  }}</UiBadge>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div></UiCard
+      ></template
+    >
+  </div>
+</template>
