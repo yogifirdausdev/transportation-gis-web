@@ -28,6 +28,10 @@ Aplikasi GIS mandiri untuk mengelola dan memublikasikan titik perlengkapan jalan
 - DB-backed admin session designed to work behind Caddy
 - Admin / GIS Manager / GIS Editor roles
 
+## Production deployment
+
+To run the app under a sub-path next to an existing Nginx/WordPress site, follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). It covers setup, Nginx config, backups and updates.
+
 ## Local development
 
 ```bash
