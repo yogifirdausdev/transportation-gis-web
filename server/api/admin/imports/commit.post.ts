@@ -26,8 +26,8 @@ export default defineEventHandler(async (event) => {
     for (const row of ready) {
       let photoPath: string | null = null
       if (row.photo) {
-        const ext = row.photo.extension === 'jpeg' ? 'jpg' : row.photo.extension
-        photoPath = await saveUpload(row.photo.buffer, `excel-row-${row.rowNumber}.${ext}`, `batch-${batchId}`)
+        // An embedded picture in an unsupported format is dropped, not fatal.
+        photoPath = await saveUpload(row.photo.buffer, `batch-${batchId}`).catch(() => null)
       }
       await client.query(`
         INSERT INTO locations(location_name,category_id,district_id,district_raw,fiscal_year,implementation_status,latitude,longitude,condition,photo_path,source_type,source_file_name,source_row,import_batch_id,created_by)

@@ -1,11 +1,11 @@
 import { requireUser } from '../../../utils/auth'
-import { saveTempImport } from '../../../utils/files'
+import { saveTempImport, MAX_IMPORT_BYTES } from '../../../utils/files'
 import { parseWorkbook, validateRows } from '../../../utils/importer'
-import { partFile, partText } from '../../../utils/multipart'
+import { partFile, partText, readLimitedMultipart } from '../../../utils/multipart'
 
 export default defineEventHandler(async (event) => {
   await requireUser(event, ['admin','manager','editor'])
-  const parts = await readMultipartFormData(event)
+  const parts = await readLimitedMultipart(event, MAX_IMPORT_BYTES)
   if (!parts) throw createError({ statusCode:400, statusMessage:'File diperlukan' })
   const file = partFile(parts,'file')
   if (!file?.data || !file.filename) throw createError({ statusCode:400, statusMessage:'Pilih file .xlsx' })

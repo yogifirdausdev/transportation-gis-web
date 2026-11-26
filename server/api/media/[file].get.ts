@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
     const types: Record<string,string> = { '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif' }
     setHeader(event, 'Content-Type', types[ext] || 'application/octet-stream')
     setHeader(event, 'Cache-Control', 'public, max-age=86400')
+    setHeader(event, 'X-Content-Type-Options', 'nosniff')
     return data
   } catch { throw createError({ statusCode: 404, statusMessage: 'File tidak ditemukan' }) }
 })

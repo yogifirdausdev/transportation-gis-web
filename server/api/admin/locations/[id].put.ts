@@ -1,7 +1,7 @@
 import { requireUser } from '../../../utils/auth'
 import { q } from '../../../utils/db'
-import { partFile, partText } from '../../../utils/multipart'
-import { saveUpload } from '../../../utils/files'
+import { partFile, partText, readLimitedMultipart } from '../../../utils/multipart'
+import { saveUpload, MAX_PHOTO_BYTES } from '../../../utils/files'
 
 function parseFiscalYear(value: string) {
   if (!value.trim()) return null
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event,'id')!
   const existing = await q('SELECT id,photo_path,source_type FROM locations WHERE id=$1 AND deleted_at IS NULL',[id])
   if (!existing.rows[0]) throw createError({statusCode:404})
-  const parts = await readMultipartFormData(event)
+  const parts = await readLimitedMultipart(event, MAX_PHOTO_BYTES + 1024 * 1024)
   if (!parts) throw createError({ statusCode:400 })
   const locationName = partText(parts,'location_name').trim()
   const categoryId = partText(parts,'category_id')
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   }
   let photoPath = existing.rows[0].photo_path as string | null
   const photo = partFile(parts,'photo')
-  if (photo?.data) photoPath = await saveUpload(Buffer.from(photo.data), photo.filename || 'photo.jpg')
+  if (photo?.data) photoPath = await saveUpload(Buffer.from(photo.data))
   await q(`UPDATE locations
     SET location_name=$1,category_id=$2,district_id=$3,district_raw=NULL,fiscal_year=$4,implementation_status=$5,
         latitude=$6,longitude=$7,condition=$8,photo_path=$9,
