@@ -11,7 +11,7 @@ async function submit(){ loading.value=true; error.value=''; try { await $fetch(
         <h1 class="text-2xl font-bold">Peta Perlengkapan Jalan</h1><p class="mt-1 text-sm text-teal-50">Masuk untuk mengelola data GIS.</p>
       </div>
       <form class="space-y-5 p-6" @submit.prevent="submit">
-        <div v-if="error" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ error }}</div>
+        <UiAlert v-if="error" variant="error" @close="error=''">{{error}}</UiAlert>
         <div class="space-y-2"><UiLabel>Email</UiLabel><UiInput v-model="email" type="email" placeholder="admin@example.com"/></div>
         <div class="space-y-2"><UiLabel>Kata Sandi</UiLabel><UiInput v-model="password" type="password"/></div>
         <UiButton type="submit" class="w-full" :disabled="loading"><LogIn class="h-4 w-4"/>{{ loading?'Sedang masuk...':'Masuk' }}</UiButton>

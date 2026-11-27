@@ -10,8 +10,8 @@ async function add(){error.value='';try{await $fetch('/api/admin/categories',{me
 <template>
   <div class="space-y-6">
     <UiPageHeader title="Kategori" description="Warna dan ikon kategori otomatis menentukan tampilan marker di peta."/>
-    <div v-if="message" class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{message}}</div>
-    <div v-if="error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{error}}</div>
+    <UiAlert v-if="message" variant="success" @close="message=''">{{message}}</UiAlert>
+    <UiAlert v-if="error" variant="error" @close="error=''">{{error}}</UiAlert>
     <div class="grid gap-4 lg:grid-cols-[1fr_360px]">
       <UiCard class="overflow-hidden">
         <div class="border-b px-5 py-4"><h2 class="font-semibold">Kategori tersedia</h2></div>

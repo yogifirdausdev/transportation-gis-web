@@ -79,22 +79,14 @@ function rowClass(row: any) {
         ></a
       ></UiPageHeader
     >
-    <div
-      v-if="error"
-      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-    >
-      {{ error }}
-    </div>
-    <div
-      v-if="result"
-      class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900"
-    >
+    <UiAlert v-if="error" variant="error" @close="error = ''">{{ error }}</UiAlert>
+    <UiAlert v-if="result" variant="success" @close="result = null">
       <div class="font-semibold">Impor selesai</div>
-      <div class="mt-1 text-sm">
+      <div class="mt-1">
         {{ result.imported }} lokasi berhasil diimpor,
         {{ result.skipped }} baris dilewati.
       </div>
-    </div>
+    </UiAlert>
     <UiCard class="p-5"
       ><div class="grid gap-4 md:grid-cols-[1fr_auto]">
         <div>

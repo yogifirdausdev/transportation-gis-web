@@ -52,7 +52,7 @@ watch(isAuthenticated, (loggedIn) => {
         <div class="shrink-0 rounded-xl bg-teal-700 p-2 text-white"><Map class="h-5 w-5" /></div>
         <div><h1 class="text-sm font-bold leading-tight tracking-tight text-slate-950 sm:text-base">Peta Perlengkapan Jalan</h1><p class="hidden text-xs text-slate-500 sm:block">Peta fasilitas transportasi</p></div>
       </div>
-      <NuxtLink to="/admin" class="ml-2 inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"><Shield class="h-4 w-4 text-teal-700" />Admin</NuxtLink>
+      <NuxtLink v-if="isAuthenticated" to="/admin" class="ml-2 inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"><Shield class="h-4 w-4 text-teal-700" />Admin</NuxtLink>
     </header>
     <div class="relative min-h-0 flex-1">
       <PublicMap :category="category" :district="district" :status="status" :year="isAuthenticated ? year : ''" :search="search" :authenticated="isAuthenticated">
